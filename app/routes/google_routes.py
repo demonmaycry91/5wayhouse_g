@@ -7,6 +7,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 import requests
 
+from app.services.google_service import write_creds_from_env
 from .. import db
 from ..models import User, Role
 
