@@ -1,6 +1,6 @@
 import os
 import markdown as md_lib
-from flask import Blueprint, render_template, current_app, Response, abort
+from flask import Blueprint, render_template, current_app, Response, abort, redirect, url_for
 from flask.views import MethodView
 from flask_login import login_required, current_user
 from app.services.pdf_service import PDFGeneratorService

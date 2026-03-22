@@ -1,9 +1,9 @@
-# 5 Way House 收銀系統 — 開發說明書
+# 💻 5 Way House 系統 — 新手開發者專用說明書
 
-> **文件版本**：v1.0 &emsp; **最後更新**：2026-03-16  
-> 本手冊面向後續接手的開發者，涵蓋架構設計、模組說明、資料庫結構、擴充指引與部署流程。
-
----
+> 🌟 **歡迎加入五味屋開發團隊！**  
+> 這是一份專門為「**剛接觸程式開發、或初次參與開源專案的新手**」所設計的手冊。
+> 別擔心裡面的名詞看起來很難，我們會用最白話的方式，帶你了解這個系統是怎麼運作的，
+> 並且手把手教你如何從 GitHub 下載程式，在你的 **Mac** 或 **Windows** 電腦上把它跑起來！
 
 ## 目錄
 
@@ -585,79 +585,81 @@ q.enqueue(send_points_email, card_id, points)
 
 ---
 
-## 15. Docker 與部署說明
+## 15. 🚀 新手入門：如何在 Mac 與 Windows 本機運行本專案
 
-### 服務架構
+當你剛接手這個專案，第一步就是要把程式碼抓到自己的電腦上跑起來。請跟著以下步驟做：
 
-```yaml
-# docker-compose.yml
-services:
-  web:     # Flask 主服務（Gunicorn）Port 5000
-  worker:  # RQ Worker（背景任務）
-  redis:   # Redis 訊息佇列
+### 🛠️ 步驟一：安裝必備軟體
+
+不管你是 Mac 還是 Windows，開發前都需要準備好三個工具：
+1. **Git**：用來下載程式碼的工具。
+   - **Mac**：打開「終端機 (Terminal)」，輸入 `git --version`。如果沒裝過，系統會跳出視窗問你要不要安裝。
+   - **Windows**：請上網搜尋 [Git for Windows](https://gitforwindows.org/) 並下載安裝檔，安裝時一直按下一步即可。
+2. **Python**（建議版本 3.12）：我們寫網站使用的語言。
+   - **Mac**：建議去官網下載安裝包，或是用 `brew install python@3.12`。
+   - **Windows**：去 [Python 官網](https://www.python.org/) 下載安裝檔。⚠️ **非常重要：安裝時一定要勾選「Add python.exe to PATH」**！
+3. **Docker Desktop**：我們用來跑資料庫與背景任務的虛擬機環境。
+   - **Mac / Windows** 皆通用：請到 [Docker 官網](https://www.docker.com/products/docker-desktop/) 下載並安裝。安裝完後請打開它，確定它在背景順利轉動。
+
+---
+
+### 💻 步驟二：從 GitHub 下載程式碼
+
+1. 打開你的命令列工具（Windows 請打開 **Git Bash** 或 PowerShell，Mac 請打開 **終端機**）。
+2. 在黑白畫面裡輸入以下指令，把它下載到桌面（或你指定的資料夾）：
+```bash
+# 讓終端機先走到你的桌面
+cd Desktop 或 cd ~/Desktop
+
+# 把專案複製下來
+git clone https://github.com/demonmaycry91/5wayhouse_g.git
+
+# 走進專案資料夾裡
+cd 5wayhouse_g
 ```
 
-### 15.1 全新部署流程（包含 Docker 安裝與初始設定）
+---
 
-當您接手系統需要安裝至伺服器或本機開發環境時：
+### ⚙️ 步驟三：執行自動安裝腳本環境
 
-**步驟一、環境準備**
-- 請確認伺服器已安裝 **Docker** 及 **Docker Compose**。
-- 若尚未安裝，請依據作業系統至 [Docker 官網](https://docs.docker.com/engine/install/) 執行一鍵指令（Linux 常見指令為 `curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh`）。
+我們寫了一個超方便的腳本，會幫你自動裝好所有需要的套件，跟設定密碼！
+- **Mac / Windows Git Bash 用戶**：
+  直接在剛剛的命令列輸入：
+  ```bash
+  bash setup.sh
+  ```
+  *(腳本會自動幫你建立 `.env` 檔案，並且安裝套件到虛擬環境 `venv` 裡。)*
 
-**步驟二、取得程式授權與環境設定**
+---
+
+### 🐳 步驟四：透過 Docker 啟動整個系統
+
+現在套件都準備好了，我們要把系統開起來！
+請確定你的 Docker Desktop 有在運作，然後輸入：
 ```bash
-# 下載與進入專案目錄
-git clone <專案的_Git_URL> 5_way_house
-cd 5_way_house
-
-# 複製並設定本地環境變數檔
-cp .env.example .env
-# 請務必編輯 .env 檔案，填寫強密碼 SECRET_KEY 避免資安外流
-```
-
-**步驟三、透過 Docker Compose 編譯與啟動服務 (自動化部署)**
-```bash
-# 這將花費 2~5 分鐘下載並編譯 Python 與必要的 OCR/PDF 工具。
-# 系統設有獨立的 entrypoint.sh 腳本，當容器啟動時將自動進行「零手動建置」：
-# 1. 執行 flask db upgrade (全自動資料表修訂與驗證)
-# 2. 執行 flask auth init-roles (自動注入 10+ 項細粒度權限節點)
-# 3. 執行 flask auth seed-users (自動填寫 6 項預設功能測試防護帳號)
 docker-compose --env-file .env up -d --build
 ```
+> *(⚠️ 第一次執行可能會花 3~5 分鐘下載東西，請耐心等他跑完。後台會自動幫你建置資料表、塞入測試帳號！)*
 
-**步驟四、登入大都會收銀系統**
-啟動完成後，即可前往 `http://<您的伺服器IP>:5001` 登入系統！
-預設帳號密碼為：
-- 帳號：`admin`
-- 密碼：`password`
+**🎉 恭喜你！系統啟動了！**
+現在打開你的瀏覽器（Chrome / Edge），在網址列輸入：
+👉 `http://localhost:5001`
+- 系統的預設最高管理員帳號是：`admin`
+- 密碼是：`password`
 
-**步驟五、手動配置 Google OAuth API 憑證（若需使用備份與 SSO 功能）**
-1. 向 GCP 申請憑證 JSON 檔，重新命名為 `client_secret.json`，放置於伺服器 `instance/` 目錄內。
-2. 以 Admin 身分登入系統，前往「系統後台管理 > 全域系統設定」點擊連結 Google 帳號，以產生 `token.json`。若無法從外部完成 OAuth 回呼，需在本地開發機取得 `token.json` 後手動上傳至伺服器 `instance/` 目錄。
+---
 
+### 🔑 步驟五：手動配置 Google 開發憑證 (選做，但強烈建議)
 
-### 15.2 常用維運指令
+因為 Google 對資安的保護機制，系統沒辦法幫你自動拿到連線權限。如果你想寫程式測試「上傳報表到 Google Drive」或「Google 登入功能」，你必須手動給他身分證。
 
-```bash
-# 啟動所有服務 (背景執行)
-docker-compose --env-file .env up -d
-
-# 進入 web 容器終端機
-docker-compose exec web bash
-
-# 查看網站防護與連線日誌 (追蹤 Bug 必用)
-docker-compose logs -f web
-docker-compose logs -f worker
-
-# 停止並關閉服務
-docker-compose down
-```
-
-### Dockerfile 重點
-
-- 基礎映像：`python:3.12-slim`
-- 已預先安裝：WeasyPrint 依賴（libpango、fonts-noto-cjk）、tesseract-ocr
+1. 到 GCP (Google Cloud Platform) 申請一組 OAuth 2.0 Web 用戶端 ID 的 JSON 憑證。
+2. 把這張憑證改名叫做 `client_secret.json`。
+3. 把這張憑證，直接丟進我們專案裡的 `instance/` 資料夾中。
+4. 用 `admin` 登入系統後，點擊右上角「**系統後台管理 > 全域系統設定**」。
+5. 點擊「**連結 Google 帳號**」，登入你自己的 Google 帳號授權。
+6. 授權成功後，系統會在你本地的 `instance/` 資料夾自動多生出一個叫 `token.json` 的檔案。
+   - *(未來如果是要幫正是伺服器更新，只要把這張 `token.json` 上傳過去伺服器就大功告成了！)*
 
 ---
 
