@@ -63,7 +63,7 @@
                             說明書
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownDocs">
-                            {% if current_user.has_role('Admin') or current_user.can('operate_pos') %}
+                            {% if current_user.has_role('Admin') or current_user.can('pos_operate_cashier') %}
                             <li><a class="dropdown-item" href="{{ url_for('main.manual', module_name='pos') }}">實體店鋪營運手冊</a></li>
                             {% endif %}
                             {% if current_user.has_role('Admin') or current_user.can('access_warehouse') %}
