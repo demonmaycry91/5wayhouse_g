@@ -83,7 +83,6 @@ def create_app(config_name=None):
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(ocr_routes.bp)
     app.register_blueprint(cashier_routes.bp)
-    app.register_blueprint(cashier_routes.bp)
     app.register_blueprint(google_routes.bp)
     app.register_blueprint(admin_routes.bp)
     app.register_blueprint(report_routes.bp)
