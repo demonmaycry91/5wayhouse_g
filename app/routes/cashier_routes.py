@@ -283,7 +283,7 @@ class POSView(PosAuthorizedView):
         return response
 
 class RecordTransactionView(PosAuthorizedView):
-    decorators = [login_required, csrf.exempt]
+    decorators = [login_required]
     
     def post(self):
         data = request.get_json()
