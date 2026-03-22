@@ -13,7 +13,7 @@ from sqlalchemy.orm import contains_eager
 from sqlalchemy import and_, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import func
-from app.modules.auth.models import User, Role, Permission, PERMISSION_DESCRIPTIONS
+from app.modules.auth.models import User, Role, PERMISSION_STRUCTURE
 from app.modules.store.models import Location, Category
 from app.modules.daily_ops.models import BusinessDay, DailySettlement
 from app.modules.pos.models import Transaction, TransactionItem

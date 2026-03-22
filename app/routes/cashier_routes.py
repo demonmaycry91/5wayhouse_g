@@ -14,7 +14,7 @@ from flask.views import MethodView
 from sqlalchemy.orm import contains_eager
 from sqlalchemy import and_, case, func
 from app.services.pdf_service import PDFGeneratorService
-from app.modules.auth.models import User, Role, Permission
+from app.modules.auth.models import User, Role
 from app.modules.store.models import Location, Category
 from app.modules.daily_ops.models import BusinessDay, DailySettlement
 from app.modules.pos.models import Transaction, TransactionItem
@@ -180,7 +180,7 @@ class SettingsView(MethodView):
     decorators = [login_required]
 
     def get(self):
-        if not current_user.can(Permission.OPERATE_POS):
+        if not current_user.can('pos_operate_cashier'):
             flash('您沒有權限存取營運系統設定。', 'danger')
             return redirect(url_for('cashier.dashboard'))
 
@@ -191,7 +191,7 @@ class SettingsView(MethodView):
         return render_template("cashier/pos_settings.html", form=form)
 
     def post(self):
-        if not current_user.can(Permission.OPERATE_POS):
+        if not current_user.can('pos_operate_cashier'):
             flash('您沒有權限存取營運系統設定。', 'danger')
             return redirect(url_for('cashier.dashboard'))
 

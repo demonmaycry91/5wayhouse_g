@@ -13,7 +13,7 @@ from flask_login import login_required
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func, case, extract, and_
 
-from app.modules.auth.models import User, Role, Permission
+from app.modules.auth.models import User, Role
 from app.modules.store.models import Location, Category
 from app.modules.daily_ops.models import BusinessDay, DailySettlement
 from app.modules.pos.models import Transaction, TransactionItem
