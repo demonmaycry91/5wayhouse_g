@@ -27,46 +27,50 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('cashier.dashboard') }}">儀表板</a>
-                    </li>
-                    {% if current_user.is_authenticated and current_user.has_role('Admin') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('report.query') }}">報表查詢</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('report.settlement') }}">合併報表結算</a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.is_authenticated %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownDocs" role="button"
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            📖 說明書
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownDocs">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('main.manual') }}">
-                                    📋 使用者手冊
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('main.dev_manual') }}">
-                                    🛠 開發說明書
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
+                    {% if request.blueprint in ['cashier', 'report', 'admin'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('cashier.dashboard') }}">店鋪營運首頁</a>
+                        </li>
+                        {% if current_user.is_authenticated and current_user.has_role('Admin') %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('report.query') }}">報表查詢</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('report.settlement') }}">合併報表結算</a>
+                        </li>
+                        {% endif %}
+                    {% elif request.blueprint == 'warehouse' %}
+                        <li class="nav-item"><a class="nav-link" href="#">庫存儀表板</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#">物資調撥與入出庫</a></li>
+                    {% elif request.blueprint == 'workshop' %}
+                        <li class="nav-item"><a class="nav-link" href="#">工坊總覽</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#">捐贈物資開箱與 OCR</a></li>
+                    {% elif request.blueprint == 'accommodation' %}
+                        <li class="nav-item"><a class="nav-link" href="#">住宿地點房間與檔期</a></li>
+                    {% elif request.blueprint == 'volunteer' %}
+                        <li class="nav-item"><a class="nav-link" href="#">志工活動列表</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#">動態感謝狀證書模板</a></li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownDocs" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            📖 說明書
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownDocs">
+                            <li><a class="dropdown-item" href="{{ url_for('main.manual') }}">📋 使用者手冊</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.dev_manual') }}">🛠 開發說明書</a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownOps" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            營運管理
+                            切換營運模組
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownOps">
-                            <li><h6 class="dropdown-header text-primary fw-bold">下一階段開發 (Phase 2)</h6></li>
+                            <li><a class="dropdown-item fw-bold text-primary" href="{{ url_for('cashier.dashboard') }}">🈺 實體據點營運</a></li>
+                            <li><h6 class="dropdown-header text-secondary fw-bold mt-2">下一階段開發 (Phase 2)</h6></li>
                             <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">📦 倉庫物流管理</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">🔨 工坊登記系統</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">🏡 住宿登錄系統</a></li>
@@ -75,19 +79,21 @@
                     </li>
                     {% endif %}
 
-                    {% if current_user.is_authenticated and current_user.has_role('Admin') %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            管理
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownAdmin">
-                            <li><a class="dropdown-item" href="{{ url_for('admin.list_locations') }}">據點管理</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin.list_users') }}">使用者管理</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin.list_roles') }}">角色權限設定</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('cashier.settings') }}">系統設定</a></li>
-                        </ul>
-                    </li>
+                    {% if request.blueprint in ['cashier', 'report', 'admin'] %}
+                        {% if current_user.is_authenticated and current_user.has_role('Admin') %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                系統後台管理
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownAdmin">
+                                <li><a class="dropdown-item" href="{{ url_for('admin.list_locations') }}">據點管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin.list_users') }}">使用者管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin.list_roles') }}">角色權限設定</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('cashier.settings') }}">進階設定 (備份與 POS)</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
                     {% endif %}
                     
                     {% if current_user.is_authenticated %}
