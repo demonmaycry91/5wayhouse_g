@@ -1,7 +1,7 @@
 import click
 from flask.cli import with_appcontext
-from . import db
-from .models import User, Role
+from app.core.extensions import db
+from app.modules.auth.models import User, Role
 
 @click.group(name='auth', help="使用者驗證相關指令")
 def auth_cli():
@@ -48,16 +48,29 @@ def reset_password(username, new_password):
 @auth_cli.command("init-roles")
 @with_appcontext
 def init_roles():
-    """在資料庫中建立預設的角色 (Admin, Cashier)"""
-    roles = ['Admin', 'Cashier']
-    for r in roles:
-        role = Role.query.filter_by(name=r).first()
+    """在資料庫中建立預設的角色與權限 (Admin, Manager, Cashier)"""
+    from app.modules.auth.models import Permission
+    import click
+    all_perms = [p for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
+    
+    default_roles = {
+        'Admin': all_perms,
+        'Manager': ['MANAGE_LOCATIONS', 'VIEW_REPORTS', 'OPERATE_POS'],
+        'Cashier': ['OPERATE_POS']
+    }
+    
+    for r_name, r_perms in default_roles.items():
+        role = Role.query.filter_by(name=r_name).first()
         if not role:
-            role = Role(name=r)
+            role = Role(name=r_name, permissions=','.join(r_perms))
             db.session.add(role)
-            click.echo(f"成功建立角色：'{r}'")
+            click.echo(f"成功建立角色：'{r_name}' 並自動分配權限。")
+        else:
+            role.permissions = ','.join(r_perms)
+            click.echo(f"已更新角色：'{r_name}' 的預設權限配置。")
+            
     db.session.commit()
-    click.echo("角色初始化完成。")
+    click.echo("所有預設角色初始化完成。")
 
 
 def init_app(app):

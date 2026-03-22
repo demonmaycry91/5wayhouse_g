@@ -94,7 +94,7 @@ button_text='返回儀表板'
                         {# --- 折扣類別按鈕區 --- #}
                         <div class="row g-2">
                             {% for category in categories %}
-                            {% if category.category_type != 'product' and category.category_type != 'other_income' %}
+                            {% if category.category_type in ['discount_fixed', 'discount_percent'] %}
                             <div class="col-4 d-grid">
                                 <button class="btn btn-lg category-btn"
                                     style="background-color: {{ category.color }}; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
@@ -153,53 +153,33 @@ button_text='返回儀表板'
                         <hr class="my-2">
                     </div>
 
-                    {# --- 計算機按鈕 (維持不變) --- #}
-                    {# ... (計算機按鈕的 HTML) ... #}
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-secondary calc-btn"
-                            data-action="clear">C</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-secondary calc-btn"
-                            data-action="undo">CE</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-secondary calc-btn"
-                            data-action="backspace">⌫</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-info calc-btn operator-btn"
-                            data-value="/">÷</button></div>
+                    {# --- 計算機按鈕 (inline onclick 保證可靠性) --- #}
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-secondary calc-btn" onclick="window.posClear()">C</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-secondary calc-btn" onclick="window.posUndo()">CE</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-secondary calc-btn" onclick="window.posBack()">⌫</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-info calc-btn" onclick="window.posOp('/')">÷</button></div>
 
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="7">7</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="8">8</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="9">9</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-info calc-btn operator-btn"
-                            data-value="*">×</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('7')">7</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('8')">8</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('9')">9</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-info calc-btn" onclick="window.posOp('*')">×</button></div>
 
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="4">4</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="5">5</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="6">6</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-info calc-btn operator-btn"
-                            data-value="-">-</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('4')">4</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('5')">5</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('6')">6</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-info calc-btn" onclick="window.posOp('-')">-</button></div>
 
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="1">1</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="2">2</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="3">3</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-info calc-btn operator-btn"
-                            data-value="+">+</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('1')">1</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('2')">2</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('3')">3</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-info calc-btn" onclick="window.posOp('+')">+</button></div>
 
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="0">0</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value="00">00</button></div>
-                    <div class="col-3 d-grid"><button class="btn btn-lg btn-light calc-btn number-btn"
-                            data-value=".">.</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('0')">0</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('00')">00</button></div>
+                    <div class="col-3 d-grid"><button type="button" class="btn btn-lg btn-light calc-btn" onclick="window.posNum('.')">.</button></div>
                     <div class="col-3 d-grid">
-                        <button id="equals-btn" class="btn btn-lg btn-primary" data-action="equals">=</button>
-                        <button id="checkout-btn" class="btn btn-lg btn-success" style="display: none;">收款結帳</button>
+                        <button type="button" id="equals-btn" class="btn btn-lg btn-primary" onclick="window.posEquals()">=</button>
+                        <button type="button" id="checkout-btn" class="btn btn-lg btn-success" style="display: none;" onclick="window.posCheckout()">收款結帳</button>
                     </div>
                 </div>
             </div>
@@ -270,13 +250,32 @@ button_text='返回儀表板'
     </div>
 </div>
 
+<!-- 存放全域狀態以便拆分出的 JS 檔案存取 -->
 <script>
-    const POS_LOCATION_SLUG = "{{ location.slug }}";
+    window.POS_API_URL = "{{ url_for('cashier.record_transaction') }}";
+    window.LOCATION_SLUG = "{{ location.slug }}";
+    window.CSRF_TOKEN = "{{ csrf_token() }}";
+    window.CHECKOUT_DELAY_SECONDS = parseInt("{{ checkout_delay }}", 10) || 3;
+    
+    // 將自動套用條件的優惠活動資料傳遞給前端 JS
+    window.AUTOMATED_DISCOUNTS = [
+        {% for category in categories %}
+            {% if category.category_type in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even', 'product_discount_percent'] %}
+            {
+                id: "{{ category.id }}",
+                name: "{{ category.name | replace('\"', '\\\"') }}",
+                type: "{{ category.category_type }}",
+                rules: {{ category.discount_rules | default('{}', true) | safe }}
+            },
+            {% endif %}
+        {% endfor %}
+    ];
+
     function confirmCloseDay() {
         if (confirm("您確定要結束本日營業並進入日結盤點流程嗎？")) {
             window.location.href = "{{ url_for('cashier.close_day', location_slug=location.slug) }}";
         }
     }
 </script>
-<script src="{{ url_for('static', filename='js/pos_scripts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pos_scripts.js') }}?v=20260322_4"></script>
 {% endblock %}

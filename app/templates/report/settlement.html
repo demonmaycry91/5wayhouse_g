@@ -71,13 +71,7 @@
     </div>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
+
 
 {% if is_settled %}
 <div class="alert alert-info d-flex justify-content-between align-items-center">
@@ -268,6 +262,93 @@
         </table>
     </div>
     
+    {# --- 銀行存款收據上傳驗證區塊 --- #}
+    <div class="card mt-4 border-primary" id="deposit-receipt-card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bank2 me-2" viewBox="0 0 16 16">
+                    <path d="M8.277.084a.5.5 0 0 0-.554 0l-7.5 5A.5.5 0 0 0 .5 6h1.875v7H1.5a.5.5 0 0 0 0 1h13a.5.5 0 0 0 0-1h-.875V6H15.5a.5.5 0 0 0 .277-.916zM12.375 13h-1.25V6h1.25zm-2.5 0h-3.75V6h3.75zm-5 0h-1.25V6h1.25zM8 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>
+                </svg>
+                銀行存款收據驗證
+            </span>
+            {% if is_settled and settlement and settlement.deposit_verified is not none %}
+                {% if settlement.deposit_verified %}
+                    <span class="badge bg-success fs-6">✅ 已核實</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark fs-6">⚠️ 有差異</span>
+                {% endif %}
+            {% else %}
+                <span class="badge bg-secondary fs-6" id="receipt-status-badge">未上傳</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+
+            {% if settlement and settlement.deposit_receipt_path %}
+            {# --- 已上傳：只顯示比對結果 --- #}
+            <div class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <img src="{{ url_for('ocr.serve_receipt', filename=settlement.deposit_receipt_path) }}"
+                         class="img-fluid rounded border" alt="存款收據">
+
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-bordered">
+                        <tr><th>系統存款金額 (H)</th><td class="font-monospace">${{ "{:,.0f}".format(grand_total.H) }}</td></tr>
+                        <tr><th>OCR 識別金額</th>
+                            <td class="font-monospace">{{ "$%,.0f" % settlement.deposit_ocr_amount if settlement.deposit_ocr_amount else '無法識別' }}</td>
+                        </tr>
+                        <tr><th>比對結果</th>
+                            <td>{{ '✅ 一致' if settlement.deposit_verified else '⚠️ 有差異，請核查' }}</td>
+                        </tr>
+                        <tr><th>上傳帳號</th>
+                            <td>{{ settlement.deposit_uploader.username if settlement.deposit_uploader_id else '未紀錄' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            {% elif is_settled %}
+            {# --- 已結算但未上傳：顯示上傳介面 --- #}
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold">上傳收據照片</label>
+                    <input type="file" class="form-control" id="receipt-file-input"
+                           accept="image/*" capture="environment">
+                    <div class="form-text">支援 JPG / PNG / WEBP，可直接用相機拍照上傳</div>
+
+                    <div id="receipt-preview-wrap" class="mt-3 d-none">
+                        <img id="receipt-preview" src="#" alt="收據預覽"
+                             class="img-fluid rounded border" style="max-height:250px;">
+                    </div>
+
+                    <button type="button" class="btn btn-outline-primary mt-3 w-100" id="ocr-upload-btn" disabled>
+                        <span id="ocr-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        掃描並驗證
+                    </button>
+                </div>
+
+                <div class="col-md-7">
+                    <label class="form-label fw-bold">比對結果</label>
+                    <div id="ocr-result-panel" class="p-3 rounded bg-light border" style="min-height:160px;">
+                        <p class="text-muted mb-0">請先上傳收據照片，系統將自動識別並比對存款金額。</p>
+                    </div>
+
+                    <div id="ocr-confirm-section" class="mt-3 d-none">
+                        <p class="fw-bold mb-2">確認此比對結果並存檔：</p>
+                        <button type="button" class="btn btn-success me-2" id="confirm-match-btn">
+                            ✅ 確認一致，儲存
+                        </button>
+                        <button type="button" class="btn btn-warning" id="confirm-mismatch-btn">
+                            ⚠️ 確認差異，仍儲存
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
     <div class="d-flex justify-content-end mt-3">
         {{ form.submit(class="btn btn-primary", disabled=(not all_closed or is_settled)) }}
     </div>
@@ -398,5 +479,127 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<script>
+(function() {
+    const fileInput = document.getElementById('receipt-file-input');
+    const previewWrap = document.getElementById('receipt-preview-wrap');
+    const previewImg = document.getElementById('receipt-preview');
+    const ocrBtn = document.getElementById('ocr-upload-btn');
+    const ocrResultPanel = document.getElementById('ocr-result-panel');
+    const ocrConfirmSection = document.getElementById('ocr-confirm-section');
+    const statusBadge = document.getElementById('receipt-status-badge');
+    const confirmMatchBtn = document.getElementById('confirm-match-btn');
+    const confirmMismatchBtn = document.getElementById('confirm-mismatch-btn');
+
+    if (!fileInput) return; // 已結算頁面不需要這段
+
+    const settlementDate = "{{ report_date.isoformat() }}";
+    const systemAmount = parseFloat("{{ grand_total.H|default(0) }}");
+    let currentReceiptPath = null;
+    let currentOcrAmount = null;
+
+    fileInput.addEventListener('change', function() {
+        if (!this.files || !this.files[0]) return;
+        const file = this.files[0];
+        const reader = new FileReader();
+        reader.onload = e => {
+            previewImg.src = e.target.result;
+            previewWrap.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+        ocrBtn.disabled = false;
+    });
+
+    ocrBtn.addEventListener('click', async function() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        ocrBtn.disabled = true;
+        document.getElementById('ocr-spinner').classList.remove('d-none');
+        ocrResultPanel.innerHTML = '<p class="text-muted">正在讀取收據...</p>';
+        ocrConfirmSection.classList.add('d-none');
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('settlement_date', settlementDate);
+        formData.append('system_amount', systemAmount);
+
+        try {
+            const resp = await fetch('/ocr/upload_deposit_receipt', {
+                method: 'POST', body: formData
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                ocrResultPanel.innerHTML = `<div class="alert alert-danger mb-0">❌ 錯誤：${data.error}</div>`;
+                ocrBtn.disabled = false;
+                return;
+            }
+
+            currentReceiptPath = data.receipt_path;
+            currentOcrAmount = data.ocr_amount;
+
+            const systemFmt = new Intl.NumberFormat().format(Math.round(systemAmount));
+            const ocrFmt = data.ocr_amount !== null ? '$' + new Intl.NumberFormat().format(Math.round(data.ocr_amount)) : '⚠️ 無法從圖片中識別金額';
+
+            let matchHtml = '';
+            if (data.match === true) {
+                matchHtml = '<div class="alert alert-success mb-0"><strong>✅ 金額一致！</strong><br>收據金額與系統記錄相符。</div>';
+                statusBadge.textContent = '✅ 識別一致'; statusBadge.className = 'badge bg-success fs-6';
+            } else if (data.match === false) {
+                const diff = data.difference !== null ? '差異：$' + new Intl.NumberFormat().format(Math.abs(data.difference)) : '';
+                matchHtml = `<div class="alert alert-warning mb-0"><strong>⚠️ 金額不符！</strong> ${diff}<br>請核查後再確認。</div>`;
+                statusBadge.textContent = '⚠️ 有差異'; statusBadge.className = 'badge bg-warning text-dark fs-6';
+            } else {
+                matchHtml = '<div class="alert alert-secondary mb-0">無法自動比對，請人工核查。</div>';
+            }
+
+            ocrResultPanel.innerHTML = `
+                <table class="table table-sm table-bordered mb-3">
+                    <tr><th>系統存款金額 (H)</th><td class="font-monospace">$${systemFmt}</td></tr>
+                    <tr><th>OCR 識別金額</th><td class="font-monospace">${ocrFmt}</td></tr>
+                </table>
+                ${matchHtml}`;
+
+            ocrConfirmSection.classList.remove('d-none');
+
+        } catch (err) {
+            ocrResultPanel.innerHTML = `<div class="alert alert-danger mb-0">網路錯誤：${err.message}</div>`;
+        } finally {
+            document.getElementById('ocr-spinner').classList.add('d-none');
+            ocrBtn.disabled = false;
+        }
+    });
+
+    async function confirmReceipt(verified) {
+        if (!currentReceiptPath) return;
+        confirmMatchBtn.disabled = true;
+        confirmMismatchBtn.disabled = true;
+
+        const resp = await fetch('/ocr/confirm_deposit_receipt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                settlement_date: settlementDate,
+                receipt_path: currentReceiptPath,
+                ocr_amount: currentOcrAmount,
+                verified: verified
+            })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            ocrConfirmSection.innerHTML = `<div class="alert alert-success mb-0">✅ 收據資料已儲存！</div>`;
+        } else {
+            alert('儲存失敗：' + data.error);
+            confirmMatchBtn.disabled = false;
+            confirmMismatchBtn.disabled = false;
+        }
+    }
+
+    if (confirmMatchBtn) confirmMatchBtn.addEventListener('click', () => confirmReceipt(true));
+    if (confirmMismatchBtn) confirmMismatchBtn.addEventListener('click', () => confirmReceipt(false));
+})();
 </script>
 {% endblock %}

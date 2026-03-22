@@ -1,92 +1,126 @@
 import os
 import json
 from flask import (
-    render_template,
-    request,
-    flash,
-    redirect,
-    url_for,
-    Blueprint,
-    jsonify,
-    current_app,
-    Response
+    render_template, request, flash, redirect, url_for,
+    Blueprint, jsonify, current_app, Response
 )
-
-from flask_login import login_user, logout_user, login_required, current_user
-from ..models import User, BusinessDay, Transaction, Location, SystemSetting, Category, TransactionItem, Role, Permission
-from .. import db, login_manager, csrf
-from ..forms import LoginForm, StartDayForm, CloseDayForm, ConfirmReportForm, GoogleSettingsForm, LocationForm, UserForm, RoleForm, CategoryForm, ReportQueryForm
+from flask_login import login_required, current_user
 from datetime import date, datetime
-from ..services import google_service
+from flask.views import MethodView
+
+# ORM & Models
 from sqlalchemy.orm import contains_eager
-from sqlalchemy import and_
-from sqlalchemy.exc import IntegrityError # 新增此行
-from ..decorators import admin_required
-from weasyprint import HTML
+from sqlalchemy import and_, case
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import func
-from sqlalchemy import case
+from app.modules.auth.models import User, Role, Permission, PERMISSION_DESCRIPTIONS
+from app.modules.store.models import Location, Category
+from app.modules.daily_ops.models import BusinessDay, DailySettlement
+from app.modules.pos.models import Transaction, TransactionItem
+from app.modules.system.models import SystemSetting
 
+# Forms
+from app.modules.auth.forms import LoginForm, UserForm, RoleForm
+from app.modules.store.forms import LocationForm, CategoryForm
+from app.modules.daily_ops.forms import StartDayForm, CloseDayForm, ConfirmReportForm, SettlementForm
+from app.modules.report.forms import ReportQueryForm
+from app.modules.system.forms import GoogleSettingsForm
 
+from app.core.extensions import db, login_manager, csrf
+from app.core.decorators import admin_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-@bp.before_request
-@login_required
-@admin_required
-def before_request():
-    """保護所有 admin 藍圖下的路由"""
-    pass
+# ==========================================
+# Base Views (OOP Inheritance)
+# ==========================================
+class AdminBaseView(MethodView):
+    """
+    Base class for all admin views.
+    Automatically applies login_required and admin_required to every method.
+    """
+    decorators = [login_required, admin_required]
 
-# --- 據點管理 (維持不變) ---
-@bp.route('/locations')
-def list_locations():
-    locations = Location.query.order_by(Location.id).all()
-    return render_template('admin/locations.html', locations=locations)
+# ==========================================
+# Location Management
+# ==========================================
+class LocationListView(AdminBaseView):
+    def get(self):
+        locations = Location.query.order_by(Location.id).all()
+        return render_template('admin/locations.html', locations=locations)
 
-@bp.route('/locations/add', methods=['GET', 'POST'])
-def add_location():
-    form = LocationForm()
-    if form.validate_on_submit():
-        new_location = Location(name=form.name.data, slug=form.slug.data)
-        db.session.add(new_location)
-        db.session.commit()
-        flash('據點已新增', 'success')
+class LocationAddView(AdminBaseView):
+    def get(self):
+        form = LocationForm()
+        return render_template('admin/location_form.html', form=form, form_title='新增據點')
+        
+    def post(self):
+        form = LocationForm()
+        if form.validate_on_submit():
+            new_location = Location(name=form.name.data, slug=form.slug.data)
+            db.session.add(new_location)
+            db.session.commit()
+            flash('據點已新增', 'success')
+            return redirect(url_for('admin.list_locations'))
+        return render_template('admin/location_form.html', form=form, form_title='新增據點')
+
+class LocationEditView(AdminBaseView):
+    def get(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        form = LocationForm(obj=location)
+        return render_template('admin/location_form.html', form=form, form_title='編輯據點')
+        
+    def post(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        form = LocationForm(obj=location)
+        if form.validate_on_submit():
+            form.populate_obj(location)
+            db.session.commit()
+            flash('據點已更新', 'success')
+            return redirect(url_for('admin.list_locations'))
+        return render_template('admin/location_form.html', form=form, form_title='編輯據點')
+
+class LocationDeleteView(AdminBaseView):
+    def post(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        if location.business_days:
+            flash(f'錯誤：無法刪除據點 "{location.name}"，因為它仍有相關的營業日紀錄。', 'danger')
+        else:
+            db.session.delete(location)
+            db.session.commit()
+            flash('據點已刪除', 'success')
         return redirect(url_for('admin.list_locations'))
-    return render_template('admin/location_form.html', form=form, form_title='新增據點')
 
-@bp.route('/locations/<int:location_id>/edit', methods=['GET', 'POST'])
-def edit_location(location_id):
-    location = Location.query.get_or_404(location_id)
-    form = LocationForm(obj=location)
-    if form.validate_on_submit():
-        form.populate_obj(location)
-        db.session.commit()
-        flash('據點已更新', 'success')
-        return redirect(url_for('admin.list_locations'))
-    return render_template('admin/location_form.html', form=form, form_title='編輯據點')
+# ==========================================
+# Category Management
+# ==========================================
+def get_category_form_data(form, category):
+    category.name = form.name.data
+    category.color = form.color.data
+    category.category_type = form.category_type.data
+    rules = {}
+    ctype = form.category_type.data
+    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even'] and form.rule_target_category_id.data is not None:
+        rules['target_category_id'] = form.rule_target_category_id.data
+    if ctype == 'buy_n_get_m':
+        if form.rule_buy_n.data is not None: rules['buy_n'] = form.rule_buy_n.data
+        if form.rule_get_m.data is not None: rules['get_m_free'] = form.rule_get_m.data
+    category.set_rules(rules) if rules else setattr(category, 'discount_rules', None)
 
-@bp.route('/locations/<int:location_id>/delete', methods=['POST'])
-def delete_location(location_id):
-    location = Location.query.get_or_404(location_id)
-    if location.business_days:
-        flash(f'錯誤：無法刪除據點 "{location.name}"，因為它仍有相關的營業日紀錄。', 'danger')
-        return redirect(url_for('admin.list_locations'))
-    db.session.delete(location)
-    db.session.commit()
-    flash('據點已刪除', 'success')
-    return redirect(url_for('admin.list_locations'))
 
-# --- 商品類別管理 ---
-@bp.route('/locations/<int:location_id>/categories', methods=['GET', 'POST'])
-@csrf.exempt
-def list_categories(location_id):
-    location = Location.query.get_or_404(location_id)
-    product_categories_query = Category.query.filter_by(location_id=location.id, category_type='product').all()
-    product_categories_choices = [(0, '--- 全部商品 ---')] + [(p.id, p.name) for p in product_categories_query]
+class CategoryListView(AdminBaseView):
+    decorators = [login_required, admin_required, csrf.exempt]
+    
+    def get(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        product_categories_query = Category.query.filter_by(location_id=location.id, category_type='product').all()
+        product_categories_choices = [(0, '--- 全部商品 ---')] + [(p.id, p.name) for p in product_categories_query]
+        categories = Category.query.filter_by(location_id=location.id).order_by(Category.id).all()
+        return render_template('admin/categories.html', location=location, categories=categories, product_categories_choices=product_categories_choices)
 
-    if request.method == 'POST':
+    def post(self, location_id):
+        location = Location.query.get_or_404(location_id)
         try:
-            # 處理現有類別的更新
             for category in location.categories:
                 cat_id = category.id
                 prefix = f'category-{cat_id}-'
@@ -94,22 +128,22 @@ def list_categories(location_id):
                     category.name = request.form.get(prefix + 'name')
                     category.color = request.form.get(prefix + 'color')
                     category.category_type = request.form.get(prefix + 'type')
-                    
                     rules = {}
                     ctype = category.category_type
-                    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even']:
+                    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even', 'product_discount_percent']:
                         target_id = request.form.get(f'rule-{cat_id}-target_category_id')
                         if target_id: rules['target_category_id'] = int(target_id)
-                    
                     if ctype == 'buy_n_get_m':
                         buy_n = request.form.get(f'rule-{cat_id}-buy_n')
                         get_m = request.form.get(f'rule-{cat_id}-get_m_free')
                         if buy_n: rules['buy_n'] = int(buy_n)
                         if get_m: rules['get_m_free'] = int(get_m)
-
+                    if ctype in ['discount_percent', 'product_discount_percent']:
+                        percent = request.form.get(f'rule-{cat_id}-percent')
+                        if percent: rules['percent'] = float(percent)
                     category.set_rules(rules) if rules else setattr(category, 'discount_rules', None)
 
-            # 處理新增的類別 - 重寫此處邏輯以避免索引錯位問題
+            # New categories
             new_names = request.form.getlist('new-name')
             new_colors = request.form.getlist('new-color')
             new_types = request.form.getlist('new-type')
@@ -125,323 +159,299 @@ def list_categories(location_id):
                         location_id=location.id,
                         category_type=new_types[i] if i < len(new_types) else 'product'
                     )
-                    
                     new_rules = {}
                     ctype = new_types[i] if i < len(new_types) else 'product'
-                    
-                    # 處理規則 - 使用單一迴圈索引，並檢查列表長度
-                    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even']:
-                        if i < len(new_targets) and new_targets[i]:
-                            new_rules['target_category_id'] = int(new_targets[i])
-                    
+                    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even', 'product_discount_percent'] and i < len(new_targets) and new_targets[i]:
+                        new_rules['target_category_id'] = int(new_targets[i])
                     if ctype == 'buy_n_get_m':
-                        if i < len(new_buy_ns) and new_buy_ns[i]:
-                            new_rules['buy_n'] = int(new_buy_ns[i])
-                        if i < len(new_get_ms) and new_get_ms[i]:
-                            new_rules['get_m_free'] = int(new_get_ms[i])
+                        if i < len(new_buy_ns) and new_buy_ns[i]: new_rules['buy_n'] = int(new_buy_ns[i])
+                        if i < len(new_get_ms) and new_get_ms[i]: new_rules['get_m_free'] = int(new_get_ms[i])
+                    if ctype in ['discount_percent', 'product_discount_percent']:
+                        new_percents = request.form.getlist('new-rule-percent')
+                        if i < len(new_percents) and new_percents[i]: new_rules['percent'] = float(new_percents[i])
                     
                     if new_rules:
                         new_category.set_rules(new_rules)
-                    
                     db.session.add(new_category)
-            
             db.session.commit()
             flash('所有變更已成功儲存！', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'儲存失敗，發生錯誤：{e}', 'danger')
-
         return redirect(url_for('admin.list_categories', location_id=location.id))
 
-    categories = Category.query.filter_by(location_id=location.id).order_by(Category.id).all()
-    return render_template('admin/categories.html', location=location, categories=categories, product_categories_choices=product_categories_choices)
+class CategoryAddView(AdminBaseView):
+    def get(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        form = CategoryForm(location_id=location.id)
+        return render_template('admin/category_form.html', form=form, form_title='新增商品類別', location=location)
 
+    def post(self, location_id):
+        location = Location.query.get_or_404(location_id)
+        form = CategoryForm(location_id=location.id)
+        if form.validate_on_submit():
+            new_category = Category(location_id=location.id)
+            get_category_form_data(form, new_category)
+            db.session.add(new_category)
+            db.session.commit()
+            flash(f'類別 "{new_category.name}" 已成功新增。', 'success')
+            return redirect(url_for('admin.list_categories', location_id=location.id))
+        return render_template('admin/category_form.html', form=form, form_title='新增商品類別', location=location)
 
-def get_category_form_data(form, category):
-    category.name = form.name.data
-    category.color = form.color.data
-    category.category_type = form.category_type.data
-    
-    rules = {}
-    ctype = form.category_type.data
-    if ctype in ['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even']:
-        if form.rule_target_category_id.data is not None:
-             rules['target_category_id'] = form.rule_target_category_id.data
-    if ctype == 'buy_n_get_m':
-        if form.rule_buy_n.data is not None:
-            rules['buy_n'] = form.rule_buy_n.data
-        if form.rule_get_m.data is not None:
-            rules['get_m_free'] = form.rule_get_m.data
-    
-    category.set_rules(rules) if rules else setattr(category, 'discount_rules', None)
+class CategoryEditView(AdminBaseView):
+    def get(self, category_id):
+        category = Category.query.get_or_404(category_id)
+        location = category.location
+        form = CategoryForm(location_id=location.id, obj=category)
+        rules = category.get_rules()
+        form.rule_target_category_id.data = rules.get('target_category_id')
+        form.rule_buy_n.data = rules.get('buy_n')
+        form.rule_get_m.data = rules.get('get_m_free')
+        return render_template('admin/category_form.html', form=form, form_title='編輯商品類別', location=location, category=category)
 
+    def post(self, category_id):
+        category = Category.query.get_or_404(category_id)
+        location = category.location
+        form = CategoryForm(location_id=location.id, obj=category)
+        if form.validate_on_submit():
+            get_category_form_data(form, category)
+            db.session.commit()
+            flash(f'類別 "{category.name}" 已更新。', 'success')
+            return redirect(url_for('admin.list_categories', location_id=location.id))
+        return render_template('admin/category_form.html', form=form, form_title='編輯商品類別', location=location, category=category)
 
-@bp.route('/locations/<int:location_id>/categories/add', methods=['GET', 'POST'])
-def add_category(location_id):
-    location = Location.query.get_or_404(location_id)
-    form = CategoryForm(location_id=location.id)
-    if form.validate_on_submit():
-        new_category = Category(location_id=location.id)
-        get_category_form_data(form, new_category)
-        db.session.add(new_category)
-        db.session.commit()
-        flash(f'類別 "{new_category.name}" 已成功新增。', 'success')
-        return redirect(url_for('admin.list_categories', location_id=location.id))
-    return render_template('admin/category_form.html', form=form, form_title='新增商品類別', location=location)
-
-@bp.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
-def edit_category(category_id):
-    category = Category.query.get_or_404(category_id)
-    location = category.location
-    form = CategoryForm(location_id=location.id, obj=category)
-    
-    if form.validate_on_submit():
-        get_category_form_data(form, category)
-        db.session.commit()
-        flash(f'類別 "{category.name}" 已更新。', 'success')
-        return redirect(url_for('admin.list_categories', location_id=location.id))
-    
-    rules = category.get_rules()
-    form.rule_target_category_id.data = rules.get('target_category_id')
-    form.rule_buy_n.data = rules.get('buy_n')
-    form.rule_get_m.data = rules.get('get_m_free')
-        
-    return render_template('admin/category_form.html', form=form, form_title='編輯商品類別', location=location, category=category)
-
-@bp.route('/categories/<int:category_id>/delete', methods=['POST'])
-def delete_category(category_id):
-    category = Category.query.get_or_404(category_id)
-    location_id = category.location_id
-    
-    # 檢查是否有任何交易項目關聯此類別
-    if TransactionItem.query.filter_by(category_id=category_id).first():
-        flash(f'錯誤：無法刪除類別 "{category.name}"，因為已有交易紀錄使用此類別。', 'danger')
-        return redirect(url_for('admin.list_categories', location_id=location_id))
-        
-    # 檢查是否有任何折扣規則關聯此類別
-    if Category.query.filter(Category.discount_rules.like(f'%"{category_id}"%')).first():
-        flash(f'錯誤：無法刪除類別 "{category.name}"，因為它被其他折扣規則所引用。', 'danger')
+class CategoryDeleteView(AdminBaseView):
+    def post(self, category_id):
+        category = Category.query.get_or_404(category_id)
+        location_id = category.location_id
+        if TransactionItem.query.filter_by(category_id=category_id).first():
+            flash(f'錯誤：無法刪除類別 "{category.name}"，因為已有交易紀錄。', 'danger')
+        elif Category.query.filter(Category.discount_rules.like(f'%"{category_id}"%')).first():
+            flash(f'錯誤：無法刪除類別 "{category.name}"，因為被其他規則引用。', 'danger')
+        else:
+            try:
+                db.session.delete(category)
+                db.session.commit()
+                flash('類別已刪除。', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'刪除失敗: {e}', 'danger')
         return redirect(url_for('admin.list_categories', location_id=location_id))
 
-    try:
-        db.session.delete(category)
-        db.session.commit()
-        flash('類別已刪除。', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'刪除失敗，發生未預期錯誤：{e}', 'danger')
-        current_app.logger.error(f"刪除類別 {category_id} 時發生錯誤: {e}", exc_info=True)
+# ==========================================
+# User and Role Management
+# ==========================================
+class UserListView(AdminBaseView):
+    def get(self):
+        users = User.query.order_by(User.id).all()
+        return render_template('admin/users.html', users=users)
 
-    return redirect(url_for('admin.list_categories', location_id=location_id))
+class UserAddView(AdminBaseView):
+    def get(self):
+        form = UserForm(user=None)
+        return render_template('admin/user_form.html', form=form, form_title="建立新使用者")
 
-# --- 使用者與角色管理 (維持不變) ---
-@bp.route('/users')
-def list_users():
-    users = User.query.order_by(User.id).all()
-    return render_template('admin/users.html', users=users)
-
-@bp.route('/users/add', methods=['GET', 'POST'])
-def add_user():
-    form = UserForm(user=None)
-    if form.validate_on_submit():
-        user = User(username=form.username.data)
-        if form.password.data:
-            user.set_password(form.password.data)
-        for role_id in form.roles.data:
-            role = Role.query.get(role_id)
-            user.roles.append(role)
-        db.session.add(user)
-        db.session.commit()
-        flash('新使用者已建立。', 'success')
-        return redirect(url_for('admin.list_users'))
-    return render_template('admin/user_form.html', form=form, form_title="建立新使用者")
-
-@bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
-def edit_user(user_id):
-    user = User.query.get_or_404(user_id)
-    form = UserForm(user=user, obj=user)
-    if form.validate_on_submit():
-        user.username = form.username.data
-        if form.password.data:
-            user.set_password(form.password.data)
-        user.roles = []
-        for role_id in form.roles.data:
-            role = Role.query.get(role_id)
-            user.roles.append(role)
-        db.session.commit()
-        flash('使用者資料已更新。', 'success')
-        return redirect(url_for('admin.list_users'))
-    form.roles.data = [role.id for role in user.roles]
-    return render_template('admin/user_form.html', form=form, form_title="編輯使用者", user=user)
-
-@bp.route('/users/<int:user_id>/delete', methods=['POST'])
-def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    db.session.delete(user)
-    db.session.commit()
-    flash('使用者已刪除。', 'success')
-    return redirect(url_for('admin.list_users'))
-
-@bp.route('/roles')
-def list_roles():
-    roles = Role.query.order_by(Role.id).all()
-    return render_template('admin/roles.html', roles=roles)
-
-@bp.route('/roles/add', methods=['GET', 'POST'])
-def add_role():
-    form = RoleForm()
-    form.permissions.choices = [
-        (p, p) for p in dir(Permission) 
-        if not p.startswith('__') and isinstance(getattr(Permission, p), str)
-    ]
-    if form.validate_on_submit():
-        role = Role(name=form.name.data, permissions=','.join(form.permissions.data))
-        db.session.add(role)
-        db.session.commit()
-        flash('新角色已建立。', 'success')
-        return redirect(url_for('admin.list_roles'))
-    return render_template('admin/role_form.html', form=form, form_title="建立新角色")
-
-@bp.route('/roles/<int:role_id>/edit', methods=['GET', 'POST'])
-def edit_role(role_id):
-    role = Role.query.get_or_404(role_id)
-    form = RoleForm(obj=role)
-    form.permissions.choices = [
-        (p, p) for p in dir(Permission) 
-        if not p.startswith('__') and isinstance(getattr(Permission, p), str)
-    ]
-    if form.validate_on_submit():
-        role.name = form.name.data
-        role.permissions = ','.join(form.permissions.data)
-        db.session.commit()
-        flash('角色已更新。', 'success')
-        return redirect(url_for('admin.list_roles'))
-    form.permissions.data = role.get_permissions()
-    return render_template('admin/role_form.html', form=form, form_title="編輯角色")
-
-@bp.route('/roles/<int:role_id>/delete', methods=['POST'])
-def delete_role(role_id):
-    role = Role.query.get_or_404(role_id)
-    db.session.delete(role)
-    db.session.commit()
-    flash('角色已刪除。', 'success')
-    return redirect(url_for('admin.list_roles'))
-
-@bp.route('/force_close_day/<int:business_day_id>', methods=['GET', 'POST'])
-@admin_required
-def force_close_day(business_day_id):
-    business_day = BusinessDay.query.get_or_404(business_day_id)
-    
-    form = CloseDayForm()
-    denominations = [1000, 500, 200, 100, 50, 10, 5, 1]
-
-    if form.validate_on_submit():
-        try:
-            total_cash_counted = 0
-            cash_breakdown = {}
-            for denom in denominations:
-                count = request.form.get(f"count_{denom}", 0, type=int)
-                total_cash_counted += count * denom
-                cash_breakdown[denom] = count
-
-            business_day.closing_cash = total_cash_counted
-            business_day.cash_breakdown = json.dumps(cash_breakdown)
-            business_day.status = "PENDING_REPORT"
+    def post(self):
+        form = UserForm(user=None)
+        if form.validate_on_submit():
+            user = User(username=form.username.data)
+            if form.password.data: user.set_password(form.password.data)
+            for role_id in form.roles.data:
+                user.roles.append(Role.query.get(role_id))
+            db.session.add(user)
             db.session.commit()
-            flash(f"已為據點 {business_day.location.name} 完成日結盤點！請前往審核報表。", "success")
-            # 修正點：在重定向時傳遞營業日的日期
-            return redirect(url_for('cashier.daily_report', location_slug=business_day.location.slug, date=business_day.date.isoformat()))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"處理日結時發生錯誤：{e}", "danger")
-            return redirect(url_for('admin.force_close_day', business_day_id=business_day.id))
+            flash('新使用者已建立。', 'success')
+            return redirect(url_for('admin.list_users'))
+        return render_template('admin/user_form.html', form=form, form_title="建立新使用者")
 
-    return render_template('admin/force_close_day.html',
-                           location=business_day.location,
-                           today_date=business_day.date.strftime("%Y-%m-%d"),
-                           denominations=denominations,
-                           form=form)
-                           
-@bp.route('/force_close_day/new', methods=['GET', 'POST'])
-@admin_required
-def new_force_close_day():
-    location_id = request.args.get('location_id')
-    date_str = request.args.get('date')
-    if not location_id or not date_str:
-        flash('缺少必要參數。', 'danger')
-        return redirect(url_for('report.query', report_type='daily_settlement_query'))
+class UserEditView(AdminBaseView):
+    def get(self, user_id):
+        user = User.query.get_or_404(user_id)
+        form = UserForm(user=user, obj=user)
+        form.roles.data = [role.id for role in user.roles]
+        return render_template('admin/user_form.html', form=form, form_title="編輯使用者", user=user)
 
-    location = Location.query.get_or_404(location_id)
-    try:
-        target_date = date.fromisoformat(date_str)
-    except ValueError:
-        flash('無效的日期格式。', 'danger')
-        return redirect(url_for('report.query', report_type='daily_settlement_query'))
-        
-    existing_day = BusinessDay.query.filter_by(location_id=location.id, date=target_date).first()
-    if existing_day:
-        flash('此營業日已存在，請勿重複建立。', 'warning')
-        return redirect(url_for('report.query', report_type='daily_settlement_query'))
-        
-    form = CloseDayForm()
-    denominations = [1000, 500, 200, 100, 50, 10, 5, 1]
-
-    if form.validate_on_submit():
-        try:
-            total_cash_counted = 0
-            cash_breakdown = {}
-            for denom in denominations:
-                count = request.form.get(f"count_{denom}", 0, type=int)
-                total_cash_counted += count * denom
-                cash_breakdown[denom] = count
-
-            new_business_day = BusinessDay(
-                date=target_date, 
-                location=location,
-                opening_cash=0.0, # 假設補登日結開店現金為0
-                closing_cash=total_cash_counted,
-                cash_breakdown=json.dumps(cash_breakdown),
-                status="CLOSED" # 補登後直接將狀態設為 CLOSED
-            )
-            db.session.add(new_business_day)
+    def post(self, user_id):
+        user = User.query.get_or_404(user_id)
+        form = UserForm(user=user, obj=user)
+        if form.validate_on_submit():
+            user.username = form.username.data
+            if form.password.data: user.set_password(form.password.data)
+            user.roles = []
+            for role_id in form.roles.data: user.roles.append(Role.query.get(role_id))
             db.session.commit()
-            flash(f"已為據點 {location.name} 補登 {target_date.strftime('%Y-%m-%d')} 日結報表並歸檔。", "success")
-            return redirect(url_for('cashier.daily_report', location_slug=location.slug, date=target_date.isoformat()))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"處理補登日結時發生錯誤：{e}", "danger")
-            return redirect(url_for('admin.new_force_close_day', location_id=location_id, date=date_str))
-            
-    return render_template('admin/force_close_day.html',
-                           location=location,
-                           today_date=target_date.strftime("%Y-%m-%d"),
-                           denominations=denominations,
-                           form=form,
-                           is_new_entry=True)
-                           
-@bp.route('/force_close_query', methods=['GET'])
-def force_close_query():
-    form = ReportQueryForm()
-    form.location_id.choices = [('all', '所有據點')] + [(str(l.id), l.name) for l in Location.query.order_by(Location.id).all()]
-    
-    results = []
-    if request.args:
-        form.process(request.args)
-        start_date_str = request.args.get('start_date')
-        end_date_str = request.args.get('end_date')
-        location_id = request.args.get('location_id')
+            flash('使用者資料已更新。', 'success')
+            return redirect(url_for('admin.list_users'))
+        return render_template('admin/user_form.html', form=form, form_title="編輯使用者", user=user)
 
-        if start_date_str:
-            start_date = date.fromisoformat(start_date_str)
-            end_date = date.fromisoformat(end_date_str) if end_date_str else date.today()
+class UserDeleteView(AdminBaseView):
+    def post(self, user_id):
+        user = User.query.get_or_404(user_id)
+        db.session.delete(user)
+        db.session.commit()
+        flash('使用者已刪除。', 'success')
+        return redirect(url_for('admin.list_users'))
 
-            # 這裡移除了對狀態的篩選
-            query = BusinessDay.query.options(db.joinedload(BusinessDay.location)).filter(
-                BusinessDay.date.between(start_date, end_date)
-            )
-            if location_id and location_id != 'all':
-                query = query.filter(BusinessDay.location_id == location_id)
+class RoleListView(AdminBaseView):
+    def get(self):
+        roles = Role.query.order_by(Role.id).all()
+        return render_template('admin/roles.html', roles=roles)
 
-            results = query.order_by(BusinessDay.date.desc(), BusinessDay.location_id).all()
+class RoleAddView(AdminBaseView):
+    def _setup_choices(self, form):
+        form.permissions.choices = [(p, f"{p} ({PERMISSION_DESCRIPTIONS.get(p, '未知權限')})") for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
 
-    return render_template('admin/force_close_query.html', form=form, results=results)
+    def get(self):
+        form = RoleForm()
+        self._setup_choices(form)
+        return render_template('admin/role_form.html', form=form, form_title="建立新角色")
+
+    def post(self):
+        form = RoleForm()
+        self._setup_choices(form)
+        if form.validate_on_submit():
+            role = Role(name=form.name.data, permissions=','.join(form.permissions.data))
+            db.session.add(role)
+            db.session.commit()
+            flash('新角色已建立。', 'success')
+            return redirect(url_for('admin.list_roles'))
+        return render_template('admin/role_form.html', form=form, form_title="建立新角色")
+
+class RoleEditView(AdminBaseView):
+    def _setup_choices(self, form):
+        form.permissions.choices = [(p, f"{p} ({PERMISSION_DESCRIPTIONS.get(p, '未知權限')})") for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
+
+    def get(self, role_id):
+        role = Role.query.get_or_404(role_id)
+        form = RoleForm(obj=role)
+        self._setup_choices(form)
+        form.permissions.data = role.get_permissions()
+        return render_template('admin/role_form.html', form=form, form_title="編輯角色")
+
+    def post(self, role_id):
+        role = Role.query.get_or_404(role_id)
+        form = RoleForm(obj=role)
+        self._setup_choices(form)
+        if form.validate_on_submit():
+            role.name = form.name.data
+            role.permissions = ','.join(form.permissions.data)
+            db.session.commit()
+            flash('角色已更新。', 'success')
+            return redirect(url_for('admin.list_roles'))
+        return render_template('admin/role_form.html', form=form, form_title="編輯角色")
+
+class RoleDeleteView(AdminBaseView):
+    def post(self, role_id):
+        role = Role.query.get_or_404(role_id)
+        db.session.delete(role)
+        db.session.commit()
+        flash('角色已刪除。', 'success')
+        return redirect(url_for('admin.list_roles'))
+
+# ==========================================
+# Force Close Operations
+# ==========================================
+class ForceCloseDayView(AdminBaseView):
+    def get(self, business_day_id):
+        bd = BusinessDay.query.get_or_404(business_day_id)
+        return render_template('admin/force_close_day.html', location=bd.location, today_date=bd.date.strftime("%Y-%m-%d"), denominations=[1000, 500, 200, 100, 50, 10, 5, 1], form=CloseDayForm())
+
+    def post(self, business_day_id):
+        bd = BusinessDay.query.get_or_404(business_day_id)
+        form = CloseDayForm()
+        if form.validate_on_submit():
+            try:
+                total, breakdown = 0, {}
+                for d in [1000, 500, 200, 100, 50, 10, 5, 1]:
+                    count = request.form.get(f"count_{d}", 0, type=int)
+                    total += count * d
+                    breakdown[d] = count
+                bd.closing_cash = total
+                bd.cash_breakdown = json.dumps(breakdown)
+                bd.status = "PENDING_REPORT"
+                db.session.commit()
+                flash(f"已完成日結！請前往審核。", "success")
+                return redirect(url_for('cashier.daily_report', location_slug=bd.location.slug, date=bd.date.isoformat()))
+            except Exception as e:
+                db.session.rollback()
+                flash(f"錯誤：{e}", "danger")
+        return self.get(business_day_id)
+
+class NewForceCloseDayView(AdminBaseView):
+    def get(self):
+        loc_id, date_str = request.args.get('location_id'), request.args.get('date')
+        if not loc_id or not date_str:
+            flash('缺少必要參數。', 'danger')
+            return redirect(url_for('report.query', report_type='daily_settlement_query'))
+        loc = Location.query.get_or_404(loc_id)
+        try: d = date.fromisoformat(date_str)
+        except ValueError: flash('無效日期', 'danger'); return redirect(url_for('report.query', report_type='daily_settlement_query'))
+        if BusinessDay.query.filter_by(location_id=loc.id, date=d).first():
+            flash('此營業日已存在。', 'warning')
+            return redirect(url_for('report.query', report_type='daily_settlement_query'))
+        return render_template('admin/force_close_day.html', location=loc, today_date=d.strftime("%Y-%m-%d"), denominations=[1000, 500, 200, 100, 50, 10, 5, 1], form=CloseDayForm(), is_new_entry=True)
+
+    def post(self):
+        loc_id, date_str = request.args.get('location_id'), request.args.get('date')
+        loc = Location.query.get_or_404(loc_id)
+        d = date.fromisoformat(date_str)
+        form = CloseDayForm()
+        if form.validate_on_submit():
+            try:
+                total, breakdown = 0, {}
+                for d_val in [1000, 500, 200, 100, 50, 10, 5, 1]:
+                    count = request.form.get(f"count_{d_val}", 0, type=int)
+                    total += count * d_val
+                    breakdown[d_val] = count
+                new_bd = BusinessDay(date=d, location=loc, opening_cash=0.0, closing_cash=total, cash_breakdown=json.dumps(breakdown), status="CLOSED")
+                db.session.add(new_bd)
+                db.session.commit()
+                flash(f"已補登 {d.strftime('%Y-%m-%d')} 日結。", "success")
+                return redirect(url_for('cashier.daily_report', location_slug=loc.slug, date=d.isoformat()))
+            except Exception as e:
+                db.session.rollback()
+                flash(f"錯誤：{e}", "danger")
+        return self.get()
+
+class ForceCloseQueryView(AdminBaseView):
+    def get(self):
+        form = ReportQueryForm()
+        form.location_id.choices = [('all', '所有據點')] + [(str(l.id), l.name) for l in Location.query.order_by(Location.id).all()]
+        results = []
+        if request.args:
+            form.process(request.args)
+            sd, ed, loc_id = request.args.get('start_date'), request.args.get('end_date'), request.args.get('location_id')
+            if sd:
+                start_date = date.fromisoformat(sd)
+                end_date = date.fromisoformat(ed) if ed else date.today()
+                query = BusinessDay.query.options(db.joinedload(BusinessDay.location)).filter(BusinessDay.date.between(start_date, end_date))
+                if loc_id and loc_id != 'all': query = query.filter(BusinessDay.location_id == loc_id)
+                results = query.order_by(BusinessDay.date.desc(), BusinessDay.location_id).all()
+        return render_template('admin/force_close_query.html', form=form, results=results)
+
+# ==========================================
+# Route Registrations
+# ==========================================
+bp.add_url_rule('/locations', view_func=LocationListView.as_view('list_locations'))
+bp.add_url_rule('/locations/add', view_func=LocationAddView.as_view('add_location'))
+bp.add_url_rule('/locations/<int:location_id>/edit', view_func=LocationEditView.as_view('edit_location'))
+bp.add_url_rule('/locations/<int:location_id>/delete', view_func=LocationDeleteView.as_view('delete_location'))
+
+bp.add_url_rule('/locations/<int:location_id>/categories', view_func=CategoryListView.as_view('list_categories'))
+bp.add_url_rule('/locations/<int:location_id>/categories/add', view_func=CategoryAddView.as_view('add_category'))
+bp.add_url_rule('/categories/<int:category_id>/edit', view_func=CategoryEditView.as_view('edit_category'))
+bp.add_url_rule('/categories/<int:category_id>/delete', view_func=CategoryDeleteView.as_view('delete_category'))
+
+bp.add_url_rule('/users', view_func=UserListView.as_view('list_users'))
+bp.add_url_rule('/users/add', view_func=UserAddView.as_view('add_user'))
+bp.add_url_rule('/users/<int:user_id>/edit', view_func=UserEditView.as_view('edit_user'))
+bp.add_url_rule('/users/<int:user_id>/delete', view_func=UserDeleteView.as_view('delete_user'))
+
+bp.add_url_rule('/roles', view_func=RoleListView.as_view('list_roles'))
+bp.add_url_rule('/roles/add', view_func=RoleAddView.as_view('add_role'))
+bp.add_url_rule('/roles/<int:role_id>/edit', view_func=RoleEditView.as_view('edit_role'))
+bp.add_url_rule('/roles/<int:role_id>/delete', view_func=RoleDeleteView.as_view('delete_role'))
+
+bp.add_url_rule('/force_close_day/<int:business_day_id>', view_func=ForceCloseDayView.as_view('force_close_day'))
+bp.add_url_rule('/force_close_day/new', view_func=NewForceCloseDayView.as_view('new_force_close_day'))
+bp.add_url_rule('/force_close_query', view_func=ForceCloseQueryView.as_view('force_close_query'))

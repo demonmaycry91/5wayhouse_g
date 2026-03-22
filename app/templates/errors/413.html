@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}上傳檔案過大 (413){% endblock %}
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="display-1 fw-bold text-warning mb-3">413</div>
+    <h2 class="mb-3">上傳的檔案太大了</h2>
+    <p class="text-muted mb-4">系統允許上傳的檔案大小上限為 20 MB，請縮小檔案後重試。</p>
+    <a href="javascript:history.back()" class="btn btn-secondary">← 返回</a>
+</div>
+{% endblock %}

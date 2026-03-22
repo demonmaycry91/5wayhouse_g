@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}功能開發中{% endblock %}
+{% block content %}
+<div class="container mt-5 text-center">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow rounded-4 border-0">
+                <div class="card-body p-5">
+                    <h1 class="display-1 text-primary mb-4"><i class="bi bi-tools"></i></h1>
+                    <h2 class="fw-bold mb-3">即將推出 (Coming Soon)</h2>
+                    <p class="text-muted fs-5 mb-4">此營運模組已排入下一階段（Phase 2）開發時程，目前空間與資料夾架構已預留。<br>敬請期待未來釋出！</p>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary btn-lg rounded-pill px-4">
+                        <i class="bi bi-house-door me-2"></i>返回首頁
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

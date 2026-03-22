@@ -38,8 +38,43 @@
                         <a class="nav-link" href="{{ url_for('report.settlement') }}">合併報表結算</a>
                     </li>
                     {% endif %}
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownDocs" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            📖 說明書
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownDocs">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('main.manual') }}">
+                                    📋 使用者手冊
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('main.dev_manual') }}">
+                                    🛠 開發說明書
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% endif %}
                 </ul>
                 <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownOps" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            營運管理
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownOps">
+                            <li><h6 class="dropdown-header text-primary fw-bold">下一階段開發 (Phase 2)</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">📦 倉庫物流管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">🔨 工坊登記系統</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">🏡 住宿登錄系統</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon') }}">🤝 志工與活動管理</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+
                     {% if current_user.is_authenticated and current_user.has_role('Admin') %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -66,6 +101,18 @@
     </nav>
 
     <main class="container my-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashes mb-4">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </main>
     

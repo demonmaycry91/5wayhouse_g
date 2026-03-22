@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: >
+      sh -c "flask db upgrade &&
+             flask auth init-roles &&
+             flask auth create-user admin password --role Admin || true &&
+             gunicorn --bind 0.0.0.0:5000 -w 4 run:app"
+    volumes:
+      # 將本機的 instance 資料夾掛載至容器內，確保 app.db (SQLite) 及 token 不會因重啟而丟失
+      # 以及 Google API credentials
+      - ./instance:/app/instance
+    ports:
+      - "5001:5000"
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      # 若使用 PostgreSQL 則取消下方註解並填寫連線字串
+      # - DATABASE_URL=postgresql://user:password@db_host:5432/db_name
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: rq worker cashier-tasks -u redis://redis:6379/0
+    volumes:
+      - ./instance:/app/instance
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLASK_APP=run.py
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:

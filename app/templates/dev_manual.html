@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header with context %}
+
+{% block title %}開發說明書{% endblock %}
+
+{% block styles %}
+<style>
+    .manual-body {
+        font-size: 0.95rem;
+        line-height: 1.8;
+        color: #212529;
+    }
+    .manual-body h1 { font-size: 1.8rem; border-bottom: 2px solid #dee2e6; padding-bottom: .5rem; margin-top: 2rem; }
+    .manual-body h2 { font-size: 1.4rem; border-bottom: 1px solid #dee2e6; padding-bottom: .3rem; margin-top: 2rem; color: #6f42c1; }
+    .manual-body h3 { font-size: 1.15rem; margin-top: 1.5rem; color: #fd7e14; }
+    .manual-body h4 { font-size: 1rem; margin-top: 1.25rem; color: #6c757d; }
+    .manual-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+    .manual-body table th { background: #f3f0ff; font-weight: 600; text-align: left; color: #6f42c1; }
+    .manual-body table td, .manual-body table th { border: 1px solid #dee2e6; padding: .5rem .75rem; }
+    .manual-body table tr:nth-child(even) { background: #fafafa; }
+    .manual-body code { background: #2b2b2b; color: #f8d08d; padding: .15em .4em; border-radius: 4px; font-size: .88em; }
+    .manual-body pre { background: #1e1e2e; color: #cdd6f4; border-radius: 10px; padding: 1.2rem; overflow-x: auto; border-left: 4px solid #6f42c1; }
+    .manual-body pre code { background: none; color: inherit; padding: 0; }
+    .manual-body blockquote { border-left: 4px solid #fd7e14; padding: .5rem 1rem; background: #fff8f0; border-radius: 0 8px 8px 0; margin: 1rem 0; color: #495057; }
+    .manual-body ul, .manual-body ol { padding-left: 1.5rem; }
+    .manual-body li { margin-bottom: .25rem; }
+    .manual-body hr { border-top: 2px dashed #dee2e6; margin: 2rem 0; }
+
+    .toc-sidebar { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; font-size: .83rem; }
+    .toc-sidebar ul { list-style: none; padding-left: 0; }
+    .toc-sidebar li { padding: .18rem 0; }
+    .toc-sidebar li a { text-decoration: none; color: #495057; }
+    .toc-sidebar li a:hover { color: #6f42c1; }
+    .toc-sidebar li li { padding-left: 1rem; font-size: .8rem; }
+
+    .dev-badge { background: linear-gradient(135deg, #6f42c1, #fd7e14); color: #fff;
+                 border-radius: 6px; padding: 2px 10px; font-size: .75rem; vertical-align: middle; }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title='開發說明書 <span class="dev-badge">Developer</span>',
+    subtitle='5 Way House 收銀系統 — 架構、模組、擴充開發指引',
+    button_url=url_for('main.dev_manual_pdf'),
+    button_text='📥 下載 PDF'
+) }}
+
+<div class="row">
+    <div class="col-lg-9">
+        <div class="card shadow-sm">
+            <div class="card-body manual-body px-4 py-4">
+                {{ manual_html | safe }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 d-none d-lg-block">
+        <div class="toc-sidebar card shadow-sm p-3">
+            <h6 class="fw-bold text-muted mb-3">🛠 快速導覽</h6>
+            {{ manual_toc | safe }}
+            <div class="mt-4 d-grid">
+                <a href="{{ url_for('main.dev_manual_pdf') }}" class="btn btn-sm btn-outline-secondary">
+                    📥 下載 PDF 版本
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

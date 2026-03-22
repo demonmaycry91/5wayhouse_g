@@ -1,0 +1,39 @@
+{% extends "print_base.html" %}
+{% block title %}5 Way House — 開發說明書{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .manual-body h1 { font-size: 20pt; border-bottom: 2px solid #6f42c1; padding-bottom: .4rem; margin-top: 28pt; }
+    .manual-body h2 { font-size: 14pt; border-bottom: 1px solid #dee2e6; padding-bottom: .3rem; margin-top: 20pt; color: #6f42c1; }
+    .manual-body h3 { font-size: 12pt; margin-top: 14pt; color: #fd7e14; }
+    .manual-body h4 { font-size: 11pt; margin-top: 10pt; color: #495057; }
+    .manual-body table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 9pt; }
+    .manual-body table th { background: #f3f0ff; font-weight: bold; text-align: left; color: #6f42c1; }
+    .manual-body table td, .manual-body table th { border: 1px solid #dee2e6; padding: 4pt 6pt; }
+    .manual-body code { background: #2b2b2b; color: #f8d08d; padding: 1pt 3pt; border-radius: 2pt; font-size: 8pt; font-family: monospace; }
+    .manual-body pre { background: #1e1e2e; color: #cdd6f4; border-radius: 4pt; padding: 8pt; font-size: 7.5pt; border-left: 3pt solid #6f42c1; }
+    .manual-body pre code { background: none; color: inherit; }
+    .manual-body blockquote { border-left: 4pt solid #fd7e14; padding: 4pt 10pt; background: #fff8f0; border-radius: 0 4pt 4pt 0; margin: 8pt 0; }
+    .manual-body ul, .manual-body ol { padding-left: 14pt; }
+    .manual-body li { margin-bottom: 2pt; }
+    .manual-body hr { border-top: 1pt dashed #dee2e6; margin: 20pt 0; }
+    .cover { text-align: center; padding: 80pt 0 40pt; page-break-after: always; }
+    .cover h1 { font-size: 28pt; font-weight: bold; color: #6f42c1; margin-bottom: 6pt; }
+    .cover .subtitle { font-size: 14pt; color: #fd7e14; margin-bottom: 10pt; }
+    .cover p { font-size: 11pt; color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cover">
+    <h1>5 Way House 收銀系統</h1>
+    <p class="subtitle">開 發 說 明 書</p>
+    <hr style="width: 200pt; margin: 20pt auto; border-top: 2pt solid #6f42c1;">
+    <p>版本 v1.0 &nbsp;|&nbsp; 2026-03-16</p>
+    <p style="margin-top:10pt; font-size: 10pt;">本文件面向後續接手的開發者，涵蓋架構設計、模組說明、<br>資料庫結構、擴充指引與部署流程。</p>
+</div>
+
+<div class="manual-body">
+    {{ manual_html | safe }}
+</div>
+{% endblock %}

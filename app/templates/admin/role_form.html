@@ -22,12 +22,18 @@
                     </div>
                     <div class="mb-3">
                         {{ form.permissions.label(class="form-label") }}
-                        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                        <div class="border rounded p-2">
                             {# --- 修正點：手動迭代以移除 bullet points --- #}
                             {% for subfield in form.permissions %}
-                                <div class="form-check">
-                                    {{ subfield(class="form-check-input") }}
-                                    {{ subfield.label(class="form-check-label") }}
+                                <div class="form-check mb-2">
+                                    {{ subfield(class="form-check-input", style="margin-top: 0.3rem;") }}
+                                    <label class="form-check-label w-100" for="{{ subfield.id }}">
+                                        {% set label_parts = subfield.label.text.split(' (') %}
+                                        <div class="fw-bold text-primary">{{ label_parts[0] }}</div>
+                                        {% if label_parts|length > 1 %}
+                                        <div class="text-muted small">{{ label_parts[1][:-1] }}</div>
+                                        {% endif %}
+                                    </label>
                                 </div>
                             {% endfor %}
                         </div>

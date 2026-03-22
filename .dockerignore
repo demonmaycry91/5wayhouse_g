@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+.git/
+.gitignore
+.DS_Store
+
+# 這裡不排除 instance，因為我們在 docker-compose 中會 mount 進去，
+# 但為了避免把開發機本機機密的 instance 資料直接 build 進 image 中，還是應該排除。
+instance/
+
+# 使用者自己的 env 檔案
+.env

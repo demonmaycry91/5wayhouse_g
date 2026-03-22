@@ -1,0 +1,40 @@
+{% extends "print_base.html" %}
+{% block title %}5 Way House — 系統使用手冊{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .manual-body h1 { font-size: 20pt; border-bottom: 2px solid #343a40; padding-bottom: .4rem; margin-top: 28pt; }
+    .manual-body h2 { font-size: 14pt; border-bottom: 1px solid #dee2e6; padding-bottom: .3rem; margin-top: 20pt; color: #0d6efd; }
+    .manual-body h3 { font-size: 12pt; margin-top: 14pt; color: #198754; }
+    .manual-body h4 { font-size: 11pt; margin-top: 10pt; color: #495057; }
+    .manual-body table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 9pt; }
+    .manual-body table th { background: #f8f9fa; font-weight: bold; text-align: left; }
+    .manual-body table td, .manual-body table th { border: 1px solid #dee2e6; padding: 4pt 6pt; }
+    .manual-body code { background: #f0f4ff; color: #c2185b; padding: 1pt 3pt; border-radius: 3pt; font-size: 8pt; font-family: monospace; }
+    .manual-body pre { background: #263238; color: #eceff1; border-radius: 4pt; padding: 8pt; font-size: 8pt; overflow: hidden; }
+    .manual-body pre code { background: none; color: inherit; }
+    .manual-body blockquote { border-left: 4pt solid #0d6efd; padding: 4pt 10pt; background: #f0f6ff; border-radius: 0 4pt 4pt 0; margin: 8pt 0; }
+    .manual-body ul, .manual-body ol { padding-left: 14pt; }
+    .manual-body li { margin-bottom: 2pt; }
+    .manual-body hr { border-top: 1pt dashed #dee2e6; margin: 20pt 0; }
+    /* Cover page */
+    .cover { text-align: center; padding: 80pt 0 40pt; page-break-after: always; }
+    .cover h1 { font-size: 28pt; font-weight: bold; color: #0d6efd; margin-bottom: 10pt; }
+    .cover p { font-size: 12pt; color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+{# 封面頁 #}
+<div class="cover">
+    <h1>5 Way House<br>收銀系統使用手冊</h1>
+    <p>版本 v1.0 &nbsp;|&nbsp; 2026-03-16</p>
+    <hr style="width: 200pt; margin: 20pt auto; border-top: 2pt solid #0d6efd;">
+    <p>本文件自動產生，如有更新請至系統內下載最新版本。</p>
+</div>
+
+{# 手冊內容 #}
+<div class="manual-body">
+    {{ manual_html | safe }}
+</div>
+{% endblock %}

@@ -18,16 +18,7 @@
 
 {# --- Flash 訊息顯示區塊 --- #}
 {# 這是 Flask 的標準作法，用來顯示從後端透過 flash() 函式傳來的臨時訊息 (例如 "操作成功" 或 "錯誤") #}
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-{% for category, message in messages %}
-<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-    {{ message }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endfor %}
-{% endif %}
-{% endwith %}
+
 
 {# --- 據點狀態列表 --- #}
 {# 使用 Bootstrap 的 list-group 元件來顯示所有營業據點的狀態 #}
@@ -35,18 +26,33 @@
     {# [修改點] 遍歷從後端傳來的 locations_status 字典。
        現在，key (我們命名為 location) 是一個完整的 Location 物件，而 value (data) 是一個包含狀態訊息的字典。#}
     {% for location, data in locations_status.items() %}
-<a href="{{ data.url }}"
-    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-    <div>
-        {# [修改點] 我們現在使用 location.name 來顯示據點的中文名稱，而不是直接印出 location 字串。 #}
-        <h5 class="mb-1">{{ location.name }}</h5>
-        <small>{{ data.message }}</small>
+<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+    <a href="{{ data.url }}" class="text-decoration-none text-dark flex-grow-1">
+        <div>
+            {# [修改點] 我們現在使用 location.name 來顯示據點的中文名稱，而不是直接印出 location 字串。 #}
+            <h5 class="mb-1">{{ location.name }}</h5>
+            <small>{{ data.message }}</small>
+        </div>
+    </a>
+    
+    <div class="d-flex align-items-center gap-2">
+        {# 如果是已結帳狀態，且登入者是 Admin，顯示「重新營業」按鈕 #}
+        {% if (data.status_text == '已日結' or data.status_text == '待確認報表') and current_user.has_role('Admin') %}
+        <form action="{{ url_for('cashier.reopen_day', location_slug=location.slug) }}" method="POST" class="m-0"
+              onsubmit="return confirm('警告：確定要強制將此據點切回「營業中」嗎？這將允許店員繼續登打今日的新交易。');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="作為錯誤日結的補救措施">
+                <i class="bi bi-arrow-counterclockwise"></i> 重新營業
+            </button>
+        </form>
+        {% endif %}
+
+        {# 右側的狀態標籤，其顏色 (badge_class) 和文字 (status_text) 也是由後端動態決定的 #}
+        <span class="badge rounded-pill {{ data.badge_class }}">
+            {{ data.status_text }}
+        </span>
     </div>
-    {# 右側的狀態標籤，其顏色 (badge_class) 和文字 (status_text) 也是由後端動態決定的 #}
-    <span class="badge rounded-pill {{ data.badge_class }}">
-        {{ data.status_text }}
-    </span>
-</a>
+</div>
 {# 如果 locations_status 是空的 (例如資料庫中沒有任何據點)，則顯示提示訊息 #}
 {% else %}
     <div class="list-group-item">

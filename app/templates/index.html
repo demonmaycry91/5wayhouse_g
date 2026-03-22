@@ -1,8 +1,117 @@
 {% extends "base.html" %}
-
-{% block title %}首頁{% endblock %}
+{% block title %}五角拌 - 營運管理服務入口{% endblock %}
 
 {% block content %}
-<h1>歡迎使用我的應用程式！</h1>
-<p>這是一個多功能的應用程式，包含了 OCR 和收銀機系統。</p>
+<div class="container py-5">
+    <div class="row text-center mb-5">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="display-4 fw-bold text-primary mb-3">5 Way House 系統入口</h1>
+            <p class="lead text-muted">請選擇您要進入的營運子系統板塊</p>
+        </div>
+    </div>
+
+    <!-- Phase 1: 實體店鋪營運 (Ready) -->
+    <h3 class="fw-bold mb-4 border-bottom pb-2">🈺 實體據點營運</h3>
+    <div class="row g-4 mb-5">
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 hover-lift">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-3 me-3">
+                            <i class="bi bi-cart-check fs-2"></i>
+                        </div>
+                        <h4 class="card-title fw-bold mb-0">POS 收銀終端</h4>
+                    </div>
+                    <p class="card-text text-muted mb-4">實體店鋪的結帳作業、掃描條碼與發票紀錄，支援多種自動折扣策略。</p>
+                    <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-outline-primary stretched-link w-100 rounded-pill">進入系統 <i class="bi bi-arrow-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 border-top border-success border-4 rounded-4 hover-lift">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle p-3 me-3">
+                            <i class="bi bi-bar-chart fs-2"></i>
+                        </div>
+                        <h4 class="card-title fw-bold mb-0">營業報表與管理</h4>
+                    </div>
+                    <p class="card-text text-muted mb-4">查詢每個據點的交班日報表、營收總計，以及執行合併報表試算結算。</p>
+                    <a href="{{ url_for('report.query') }}" class="btn btn-outline-success w-100 rounded-pill" style="position: relative; z-index: 2;">查詢報表</a>
+                </div>
+            </div>
+        </div>
+        {% if current_user.has_role('Admin') %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4 rounded-4 hover-lift">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-3 me-3">
+                            <i class="bi bi-gear fs-2"></i>
+                        </div>
+                        <h4 class="card-title fw-bold mb-0">系統後台設定</h4>
+                    </div>
+                    <p class="card-text text-muted mb-4">據點管理、使用者權限控制、分類目錄設置，以及雲端備份關聯授權。</p>
+                    <a href="{{ url_for('admin.list_locations') }}" class="btn btn-outline-danger w-100 rounded-pill" style="position: relative; z-index: 2;">進入設定</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Phase 2: 未來營運計畫 (Coming Soon) -->
+    <h3 class="fw-bold mb-4 border-bottom pb-2 mt-5">🚀 下一階段開發 (Phase 2)</h3>
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-3 rounded-4 bg-light">
+                <div class="card-body p-4 text-center">
+                    <h1 class="text-secondary mb-3"><i class="bi bi-box-seam"></i></h1>
+                    <h5 class="fw-bold text-dark">倉庫物流管理</h5>
+                    <p class="text-muted small">入出庫盤點、貨物調撥</p>
+                    <a href="{{ url_for('main.coming_soon') }}" class="btn btn-sm btn-secondary w-100 rounded-pill mt-auto">開發中</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-3 rounded-4 bg-light">
+                <div class="card-body p-4 text-center">
+                    <h1 class="text-secondary mb-3"><i class="bi bi-hammer"></i></h1>
+                    <h5 class="fw-bold text-dark">工坊登記系統</h5>
+                    <p class="text-muted small">捐贈物資開箱與 OCR 歸檔</p>
+                    <a href="{{ url_for('main.coming_soon') }}" class="btn btn-sm btn-secondary w-100 rounded-pill mt-auto">開發中</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-3 rounded-4 bg-light">
+                <div class="card-body p-4 text-center">
+                    <h1 class="text-secondary mb-3"><i class="bi bi-house-heart"></i></h1>
+                    <h5 class="fw-bold text-dark">住宿登錄系統</h5>
+                    <p class="text-muted small">多地點房間與住宿時段管理</p>
+                    <a href="{{ url_for('main.coming_soon') }}" class="btn btn-sm btn-secondary w-100 rounded-pill mt-auto">開發中</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-3 rounded-4 bg-light">
+                <div class="card-body p-4 text-center">
+                    <h1 class="text-secondary mb-3"><i class="bi bi-people"></i></h1>
+                    <h5 class="fw-bold text-dark">志工與活動管理</h5>
+                    <p class="text-muted small">活動登錄與感謝狀自動生成</p>
+                    <a href="{{ url_for('main.coming_soon') }}" class="btn btn-sm btn-secondary w-100 rounded-pill mt-auto">開發中</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+</style>
 {% endblock %}

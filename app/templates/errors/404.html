@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}找不到頁面 (404){% endblock %}
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="display-1 fw-bold text-muted mb-3">404</div>
+    <h2 class="mb-3">找不到這個頁面</h2>
+    <p class="text-muted mb-4">您要尋找的頁面不存在或已被移動。</p>
+    <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-primary">
+        ← 返回首頁
+    </a>
+</div>
+{% endblock %}

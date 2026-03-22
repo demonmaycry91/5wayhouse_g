@@ -43,11 +43,10 @@
         visibility: hidden;
     }
     .rule-part {
-        display: flex;
+        display: none;
         align-items: center;
         gap: 5px;
         white-space: nowrap;
-        visibility: hidden;
     }
     .rule-input { width: 60px; }
     .rule-part label {
@@ -60,22 +59,15 @@
 
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center">
-    {{ page_header( title='管理商品類別', subtitle='據點: ' ~ location.name ) }}
-</div>
-<a href="{{ url_for('admin.list_locations') }}" class="btn btn-secondary mb-3">返回據點列表</a>
+<div class="container-fluid py-4">
+    {{ page_header(
+        title='管理商品類別 - ' ~ location.name,
+        subtitle='據點專屬的分類、按鈕與打折活動設定',
+        button_url=url_for('admin.list_locations'),
+        button_text='返回據點列表'
+    ) }}
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
-
+    <div class="row">
 <form id="category-form" method="POST" action="{{ url_for('admin.list_categories', location_id=location.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="card">
@@ -103,6 +95,7 @@
                                     <option value="product" {% if category.category_type == 'product' %}selected{% endif %}>一般商品</option>
                                     <option value="discount_fixed" {% if category.category_type == 'discount_fixed' %}selected{% endif %}>固定折扣</option>
                                     <option value="discount_percent" {% if category.category_type == 'discount_percent' %}selected{% endif %}>百分比折扣</option>
+                                    <option value="product_discount_percent" {% if category.category_type == 'product_discount_percent' %}selected{% endif %}>商品打折</option>
                                     <option value="buy_n_get_m" {% if category.category_type == 'buy_n_get_m' %}selected{% endif %}>買N送M</option>
                                     <option value="buy_x_get_x_minus_1" {% if category.category_type == 'buy_x_get_x_minus_1' %}selected{% endif %}>買X送X-1</option>
                                     <option value="buy_odd_even" {% if category.category_type == 'buy_odd_even' %}selected{% endif %}>成雙優惠</option>
@@ -127,6 +120,10 @@
                                         <label>送</label>
                                         <input type="number" class="rule-input" name="rule-{{ category.id }}-get_m_free" value="{{ rules.get_m_free or '' }}">
                                     </div>
+                                    <div class="rule-part discount-percent-rule">
+                                        <label>設定折數(如8或8.5)</label>
+                                        <input type="number" class="rule-input" name="rule-{{ category.id }}-percent" value="{{ rules.percent or '' }}" placeholder="如 8 或 8.5" min="1" max="9.9" step="0.1">
+                                    </div>
                                 </div>
                             </td>
                             <td class="text-end">
@@ -146,6 +143,7 @@
                                     <option value="product">一般商品</option>
                                     <option value="discount_fixed">固定折扣</option>
                                     <option value="discount_percent">百分比折扣</option>
+                                    <option value="product_discount_percent">商品打折</option>
                                     <option value="buy_n_get_m">買N送M</option>
                                     <option value="buy_x_get_x_minus_1">買X送X-1</option>
                                     <option value="buy_odd_even">成雙優惠</option>
@@ -168,6 +166,10 @@
                                         <input type="number" class="rule-input" name="new-rule-buy_n" placeholder="N">
                                         <label>送</label>
                                         <input type="number" class="rule-input" name="new-rule-get_m_free" placeholder="M">
+                                    </div>
+                                    <div class="rule-part discount-percent-rule">
+                                        <label>設定折數(如8或8.5)</label>
+                                        <input type="number" class="rule-input" name="new-rule-percent" placeholder="如 8 或 8.5" min="1" max="9.9" step="0.1">
                                     </div>
                                 </div>
                             </td>
@@ -197,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'product': 'POS 上的商品按鈕',
         'discount_fixed': '固定金額折價券',
         'discount_percent': '對整筆交易總額打折',
+        'product_discount_percent': '針對特定類別商品自動打折',
         'buy_n_get_m': '固定數量組合優惠 (買N送M)',
         'buy_x_get_x_minus_1': '動態優惠 (買X件送X-1件)',
         'buy_odd_even': '成雙優惠 (買奇數件更划算)',
@@ -208,23 +211,37 @@ document.addEventListener('DOMContentLoaded', function() {
         const rulesContainer = row.querySelector('.rules-container');
         const targetRule = row.querySelector('.target-rule');
         const buyNGetMRule = row.querySelector('.buy-n-get-m-rule');
+        const discountPercentRule = row.querySelector('.discount-percent-rule');
         const descriptionCell = row.querySelector('.description-cell');
         const selectedType = typeSelect.value;
 
         descriptionCell.textContent = typeDescriptions[selectedType] || '';
 
-        targetRule.style.visibility = 'hidden';
-        buyNGetMRule.style.visibility = 'hidden';
+        targetRule.style.display = 'none';
+        buyNGetMRule.style.display = 'none';
+        if (discountPercentRule) {
+            discountPercentRule.style.display = 'none';
+        }
         
-        if (['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even'].includes(selectedType)) {
+        if (['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even', 'product_discount_percent'].includes(selectedType)) {
             rulesContainer.style.visibility = 'visible';
-            targetRule.style.visibility = 'visible';
+            targetRule.style.display = 'flex';
+        } else if (selectedType === 'discount_percent') {
+            rulesContainer.style.visibility = 'visible';
+        }
+        
+        if (['discount_percent', 'product_discount_percent'].includes(selectedType)) {
+            if (discountPercentRule) {
+                discountPercentRule.style.display = 'flex';
+            }
         } else {
-            rulesContainer.style.visibility = 'hidden';
+            if (!['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even'].includes(selectedType)) {
+                rulesContainer.style.visibility = 'hidden';
+            }
         }
         
         if (selectedType === 'buy_n_get_m') {
-            buyNGetMRule.style.visibility = 'visible';
+            buyNGetMRule.style.display = 'flex';
         }
     }
 

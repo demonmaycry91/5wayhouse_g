@@ -4,8 +4,8 @@ import atexit
 import threading
 from flask.cli import with_appcontext
 from flask import current_app
-from .services.backup_service import backup_instance_to_drive, BackupScheduler
-from .models import SystemSetting
+from .services.backup_service import BackupService, BackupScheduler
+from app.modules.system.models import SystemSetting
 
 @click.group(name='backup', help="管理雲端備份相關指令")
 def backup_cli():
@@ -18,10 +18,10 @@ def init_backup_scheduler():
     try:
         backup_frequency = SystemSetting.get('instance_backup_frequency', 'off')
         if backup_frequency == 'startup':
-            backup_instance_to_drive()
+            BackupService.backup_instance_to_drive()
             click.echo("已執行啟動時備份。")
         elif backup_frequency == 'shutdown':
-            atexit.register(backup_instance_to_drive)
+            atexit.register(BackupService.backup_instance_to_drive)
             click.echo("已註冊關閉時備份。")
         elif backup_frequency == 'interval':
             scheduler = BackupScheduler(current_app)

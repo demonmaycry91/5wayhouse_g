@@ -1,747 +1,407 @@
-document.addEventListener("DOMContentLoaded", function () {
-    // --- DOM 元素 ---
-    const displayExpression = document.getElementById("display-expression");
-    const displayMain = document.getElementById("display-main");
-    const displaySub = document.getElementById("display-sub");
-    const receiptDetails = document.getElementById("receipt-details");
-    const categoryButtonsContainer = document.getElementById("category-buttons-container");
-    const equalsBtn = document.getElementById("equals-btn");
-    const checkoutBtn = document.getElementById("checkout-btn");
+// app/static/js/pos_scripts.js
 
-    // --- 狀態變數 ---
-    let expression = [];
-    let currentInput = '0';
-    let transactionItems = [];
-    let isReadyForNewInput = false;
-    let inPaymentMode = false;
-    let activeDiscountMode = null;
-    let finalTotalForPayment = 0;
-    let isTransactionComplete = false;
-
-    // =================================================================
-    // SECTION 1: 核心計算與狀態管理函式
-    // =================================================================
-
-    function resetCalculator() {
-        expression = [];
-        currentInput = '0';
-        transactionItems = [];
-        isReadyForNewInput = false;
-        inPaymentMode = false;
-        activeDiscountMode = null;
-        finalTotalForPayment = 0;
-        isTransactionComplete = false;
-
-        document.querySelectorAll(".category-btn").forEach(btn => {
-            if (btn.dataset.type === 'discount_percent') {
-                btn.disabled = true;
-            } else {
-                btn.disabled = false;
-            }
-        });
-        document.querySelectorAll(".calc-btn").forEach(btn => btn.disabled = false);
-
-        equalsBtn.style.display = 'block';
-        checkoutBtn.style.display = 'none';
-
-        updateReceipt();
-        updateDisplay();
-    }
-
-    function checkAndResetAfterTransaction() {
-        if (isTransactionComplete) {
-            resetCalculator();
-            return true;
-        }
-        return false;
-    }
-    
-    function updateDashboardTotals(totalSales, totalTransactions, totalItems, donationTotal, otherTotal) {
-        document.getElementById("total-sales").innerText = `$ ${Math.round(totalSales).toLocaleString()}`;
-        document.getElementById("total-transactions").innerText = totalTransactions;
-        document.getElementById("total-items").innerText = totalItems;
-        document.getElementById("donation-total").innerText = `$ ${Math.round(donationTotal).toLocaleString()}`;
-        document.getElementById("other-total").innerText = `$ ${Math.round(otherTotal).toLocaleString()}`;
-        document.getElementById("other-income-total").innerText = `$ ${Math.round(donationTotal + otherTotal).toLocaleString()}`;
-    }
-
-    function updateDisplay(subText = null) {
-        const mainValue = parseFloat(currentInput) || 0;
-        displayMain.innerText = mainValue.toLocaleString('en-US', { maximumFractionDigits: 2 });
-
-        if (inPaymentMode || activeDiscountMode) {
-            const total = calculateCurrentTotal();
-            displayExpression.innerText = `小計: ${total.toLocaleString('en-US')}`;
-        } else {
-            const itemsText = transactionItems.map(item => item.displayText).join(' + ');
-            const currentExpressionText = [...expression, (currentInput !== '0' || expression.length > 0) ? currentInput : ''].join(' ');
-            const fullExpression = [itemsText, currentExpressionText].filter(Boolean).join(' + ').replace(/\+ -/g, '- ');
-            displayExpression.innerText = fullExpression;
-        }
-
-        if (subText) {
-            displaySub.innerText = subText;
-        } else if (activeDiscountMode) {
-            displaySub.innerText = `請輸入折扣數字 (例如 9折 輸入 9)`;
-        } else if (inPaymentMode) {
-            displaySub.innerText = `應收: ${finalTotalForPayment.toLocaleString('en-US')} / 實收: ${mainValue.toLocaleString('en-US')}`;
-        } else {
-            const currentTotal = calculateCurrentTotal();
-            displaySub.innerText = `小計: ${currentTotal.toLocaleString('en-US')}`;
-        }
-    }
-
-    function calculateCurrentTotal() {
-        const itemsTotal = transactionItems.reduce((sum, item) => sum + item.price, 0);
-
-        if (activeDiscountMode || inPaymentMode) {
-            return itemsTotal;
-        }
+function safeCalculate(exprStr) {
+    try {
+        let s = String(exprStr).replace(/[^0-9.+\-*/()\s]/g, '').trim();
+        if (['+', '-', '*', '/'].includes(s.slice(-1))) s = s.slice(0, -1).trim();
+        if (s === '') return 0;
         
-        let exprString = [...expression, currentInput].join(' ');
-        if (['+', '-', '*', '/'].includes(exprString.trim().slice(-1))) {
-            exprString = exprString.trim().slice(0, -1);
-        }
-        const currentExpressionValue = safeCalculate(exprString);
-        return itemsTotal + currentExpressionValue;
-    }
+        if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
 
-    function safeCalculate(exprStr) {
-        try {
-            let sanitizedExpr = String(exprStr).replace(/[^0-9.+\-*/().\s]/g, '');
-            if (!sanitizedExpr.trim() || ['+', '-', '*', '/'].includes(sanitizedExpr.trim().slice(-1))) {
-                sanitizedExpr = sanitizedExpr.trim().slice(0, -1);
+        let tokens = s.match(/(^-?\d+\.?\d*)|(\d+\.?\d*)|[+\-*/]/g) || [];
+        if (!tokens.length) return 0;
+
+        for (let i = 1; i < tokens.length - 1; i += 2) {
+            if (tokens[i] === '*' || tokens[i] === '/') {
+                let a = parseFloat(tokens[i-1]), b = parseFloat(tokens[i+1]);
+                let res = tokens[i] === '*' ? a * b : (b !== 0 ? a / b : 0);
+                tokens.splice(i-1, 3, res.toString());
+                i -= 2;
             }
-            if (sanitizedExpr.trim() === '') return 0;
-            return new Function('return ' + sanitizedExpr)();
-        } catch { return 0; }
+        }
+
+        let result = parseFloat(tokens[0]) || 0;
+        for (let i = 1; i < tokens.length - 1; i += 2) {
+            let op = tokens[i], b = parseFloat(tokens[i+1]) || 0;
+            if (op === '+') result += b; else if (op === '-') result -= b;
+        }
+        return result;
+    } catch (e) { return 0; }
+}
+
+class POSTransaction {
+    constructor() { Object.assign(this, this.getDefaults()); }
+    getDefaults() {
+        return {
+            expression: [], currentInput: '0', items: [],
+            isReadyForNewInput: false, inPaymentMode: false,
+            activeDiscountMode: null, finalTotalForPayment: 0, isComplete: false
+        };
     }
+    reset() { Object.assign(this, this.getDefaults()); }
 
-    // =================================================================
-    // SECTION 2: 按鈕事件處理函式
-    // =================================================================
-
-    function handleNumber(value) {
-        if (checkAndResetAfterTransaction()) {
-            handleNumber(value);
-            return;
-        }
-        if (isReadyForNewInput) {
-            currentInput = (value === '.') ? '0.' : value;
-            isReadyForNewInput = false;
-        } else {
-            if (currentInput === '0' && value !== '.' && value !== '00') currentInput = value;
-            else if (value === '.' && currentInput.includes('.')) return;
-            else if (currentInput.length < 14) currentInput += value;
-        }
-        updateDisplay();
-    }
-
-    function handleOperator(op) {
-        if (checkAndResetAfterTransaction()) return;
-        if (inPaymentMode || activeDiscountMode) return;
-        expression.push(currentInput);
-        expression.push(op);
-        currentInput = '0';
-        isReadyForNewInput = true;
-        updateDisplay();
-    }
-    
-    // 修正點: 將按鈕事件監聽器從各個按鈕移到父容器，並使用事件委派
-    categoryButtonsContainer.addEventListener('click', (event) => {
-        const btn = event.target.closest('.category-btn');
-        if (!btn) return;
-        handleCategoryClick(btn);
-    });
-
-    function handleCategoryClick(btn) {
-        if (checkAndResetAfterTransaction()) {
-            handleCategoryClick(btn);
-            return;
-        }
-
-        const categoryId = btn.dataset.id;
-        const categoryName = btn.dataset.name;
-        const categoryType = btn.dataset.type;
-        const rules = JSON.parse(btn.dataset.rules);
-
-        if (categoryType === 'discount_percent') {
-            activateDiscountPercent(categoryId, categoryName, rules);
-            return;
-        }
-
-        if (inPaymentMode) return;
-
-        if (categoryType === 'other_income') {
-             applyOtherIncome(categoryId, categoryName);
-             return;
-        }
-
-        switch(categoryType) {
-            case 'product': applyProduct(categoryId, categoryName); break;
-            case 'discount_fixed': applyDiscountFixed(categoryId, categoryName); break;
-            case 'buy_n_get_m': applyBuyNGetM(categoryId, categoryName, rules); break;
-            case 'buy_x_get_x_minus_1': applyBuyXGetXMinus1(categoryId, categoryName, rules); break;
-            case 'buy_odd_even': applyProgressivePairDiscount(categoryId, categoryName, rules); break;
-        }
-    }
-
-    function handleEquals() {
-        if (checkAndResetAfterTransaction()) return;
-
-        if (activeDiscountMode) {
-            applyDiscountPercent();
-        } else if (!inPaymentMode) {
-            const finalValue = safeCalculate([...expression, currentInput].join(' '));
-            if (finalValue !== 0 || (expression.length > 0 && currentInput === '0')) {
-                 transactionItems.push({
-                    price: finalValue, unitPrice: finalValue, quantity: 1,
-                    category_id: null, category_type: 'product',
-                    categoryName: "手動輸入", displayText: finalValue.toString()
-                });
-            }
-            expression = [];
-            currentInput = '0';
-            updateReceipt();
-            enterPaymentMode();
-        } else {
-             enterFinalPaymentStage();
-        }
-    }
-
-    function handleUndo() {
-        if (inPaymentMode || activeDiscountMode) return;
-
-        const hasActiveEntry = currentInput !== '0' || expression.length > 0;
-        if (hasActiveEntry) {
-            currentInput = '0';
-            expression = [];
-        } else if (transactionItems.length > 0) {
-            const removedItem = transactionItems.pop();
-            recalculateAllActiveDiscounts();
-        }
-        updateDisplay();
-        updateReceipt();
-    }
-    
-    // =================================================================
-    // SECTION 3: 折扣演算法
-    // =================================================================
-
-    function applyProduct(categoryId, categoryName) {
-        const value = safeCalculate([...expression, currentInput].join(' '));
-        if (value <= 0) return;
-        let quantity = 1;
-        let unitPrice = value;
-        let displayText = value.toString();
-        const exprString = [...expression, currentInput].join('');
-        if (exprString.includes('*') && !exprString.match(/[+\-\/]/)) {
-            const parts = exprString.split('*');
-            quantity = parseInt(safeCalculate(parts[0]), 10);
-            unitPrice = safeCalculate(parts[1]);
-            displayText = `${quantity}*${unitPrice}`;
-        }
-        transactionItems.push({
-            price: quantity * unitPrice, unitPrice, quantity,
-            category_id: categoryId, category_type: 'product',
-            categoryName, displayText
-        });
-        expression = [];
-        currentInput = '0';
-
-        recalculateRelevantDiscounts(categoryId);
-        updateReceipt();
-        updateDisplay();
-    }
-    
-    async function applyOtherIncome(categoryId, categoryName) {
-    const value = safeCalculate([...expression, currentInput].join(' '));
-    if (value <= 0) {
-        updateDisplay("金額必須大於 0");
-        return;
-    }
-
-    const items = [{
-        price: value, unitPrice: value, quantity: 1,
-        category_id: categoryId, category_type: 'other_income',
-        categoryName, displayText: value.toString()
-    }];
-
-    // 修正點：將 value 作為 paidAmount 和 changeReceived 傳入
-    // 由於其他收入沒有應收金額，直接將收到現金設為輸入的金額，找零為 0
-    const success = await sendTransactionToServer(items, value, 0);
-
-    if (success) {
-        updateReceiptForOtherIncome(value, categoryName);
-        finalizeTransaction(true, value, 0);
-    } else {
-        finalizeTransaction(false, null, null);
+    get currentItemsTotal() { return this.items.reduce((sum, i) => sum + i.price, 0); }
+    getCurrentTotal() {
+        if (this.activeDiscountMode || this.inPaymentMode) return this.currentItemsTotal;
+        let exprStr = [...this.expression, this.currentInput].join(' ');
+        if (['+', '-', '*', '/'].includes(exprStr.trim().slice(-1))) exprStr = exprStr.slice(0, -1).trim();
+        return this.currentItemsTotal + safeCalculate(exprStr);
     }
 }
 
-    function recalculateRelevantDiscounts(changedCategoryId) {
-        const activeDiscounts = transactionItems.filter(item =>
-            item.price < 0 && item.rules && (item.rules.target_category_id == changedCategoryId || item.rules.target_category_id == 0)
-        );
-        activeDiscounts.forEach(discount => {
-            const btnDataset = {
-                id: discount.category_id, name: discount.originalName,
-                type: discount.category_type, rules: JSON.stringify(discount.rules)
-            };
-            handleCategoryClick({ dataset: btnDataset });
-        });
+class POSUIManager {
+    constructor() {
+        ['displayExpression', 'displayMain', 'displaySub', 'receiptDetails', 'equalsBtn', 'checkoutBtn']
+            .forEach(id => this[id] = document.getElementById(id.replace(/[A-Z]/g, m => "-" + m.toLowerCase())));
+        this.equalsBtn = document.getElementById("equals-btn");
+        this.checkoutBtn = document.getElementById("checkout-btn");
     }
 
-    function recalculateAllActiveDiscounts() {
-        const activeDiscounts = transactionItems.filter(item => item.price < 0 && item.rules);
-        activeDiscounts.forEach(discount => {
-             const btnDataset = {
-                id: discount.category_id, name: discount.originalName,
-                type: discount.category_type, rules: JSON.stringify(discount.rules)
-            };
-            handleCategoryClick({ dataset: btnDataset });
-        });
+    updateDashboardTotals(tSales, tTrans, tItems, donTotal, otherTotal) {
+        const el = id => document.getElementById(id);
+        const fmt = n => `$ ${Math.round(n).toLocaleString()}`;
+        if (el("total-sales")) el("total-sales").innerText = fmt(tSales);
+        if (el("total-transactions")) el("total-transactions").innerText = tTrans;
+        if (el("total-items")) el("total-items").innerText = tItems;
+        if (el("donation-total")) el("donation-total").innerText = fmt(donTotal);
+        if (el("other-total")) el("other-total").innerText = fmt(otherTotal);
+        if (el("other-income-total")) el("other-income-total").innerText = fmt(donTotal + otherTotal);
     }
 
-    function applyDiscountFixed(categoryId, categoryName) {
-        const value = safeCalculate([...expression, currentInput].join(' '));
-        if (value <= 0) return;
-        transactionItems.push({
-            price: -value, unitPrice: -value, quantity: 1,
-            category_id: categoryId, category_type: 'discount_fixed',
-            categoryName, displayText: `-${value}`
-        });
-        expression = [];
-        currentInput = '0';
-        updateReceipt();
-        updateDisplay();
-    }
-
-    function activateDiscountPercent(categoryId, categoryName, rules) {
-        if (!inPaymentMode) {
-            enterPaymentMode();
-        }
-        activeDiscountMode = { id: categoryId, name: categoryName, rules: rules };
-        isReadyForNewInput = true;
-        equalsBtn.style.display = 'block';
-        checkoutBtn.style.display = 'none';
-        updateDisplay();
-    }
-
-    function applyDiscountPercent() {
-        if (!activeDiscountMode) return;
-
-        const { id, name } = activeDiscountMode;
-        const subtotal = calculateCurrentTotal();
-        let discountValue = parseFloat(currentInput);
-        if (isNaN(discountValue) || discountValue < 0 || discountValue > 100) {
-            return updateDisplay("錯誤：請輸入有效的折扣數字 (0-100)");
-        }
-        const multiplier = (discountValue < 10) ? discountValue / 10 : discountValue / 100;
-        const discountAmount = -Math.round(subtotal * (1 - multiplier));
-
-        transactionItems = transactionItems.filter(item => item.category_id !== id);
-
-        if(discountAmount < 0) {
-            transactionItems.push({
-                price: discountAmount, unitPrice: discountAmount, quantity: 1,
-                category_id: id, category_type: 'discount_percent',
-                categoryName: `${name} ${discountValue}折`,
-                displayText: `-${Math.abs(discountAmount)}`
-            });
-        }
-        activeDiscountMode = null;
-        currentInput = '0';
-        updateReceipt();
-        enterPaymentMode();
-    }
-
-    function applyBuyNGetM(categoryId, categoryName, rules) {
-        const { target_category_id, buy_n, get_m_free } = rules;
-        const eligibleItems = transactionItems.filter(item => {
-            if (target_category_id == 0) return item.price > 0 && item.category_type === 'product';
-            return item.category_id == target_category_id && item.price > 0;
-        });
-        if (eligibleItems.length === 0) {
-            const subText = `不符合「${categoryName}」活動資格`;
-            updateDisplay(subText);
-            updateReceipt(subText);
-            return;
-        }
-        const totalQuantity = eligibleItems.reduce((sum, item) => sum + item.quantity, 0);
-        transactionItems = transactionItems.filter(item => item.category_id !== categoryId);
-        if (totalQuantity < buy_n) {
-            const subText = `提示: 再購 ${buy_n - totalQuantity} 件享「${categoryName}」`;
-            updateDisplay(subText);
-            updateReceipt(subText);
-            return;
-        }
-        const numberOfDeals = Math.floor(totalQuantity / buy_n);
-        const itemsToDiscount = numberOfDeals * get_m_free;
-        const discountAmount = calculateDiscountFromCheapest(eligibleItems, itemsToDiscount);
-        if(discountAmount > 0) {
-            transactionItems.push({
-                price: -discountAmount, unitPrice: -discountAmount, quantity: 1,
-                category_id: categoryId, category_type: 'buy_n_get_m',
-                categoryName: `${categoryName} (送${itemsToDiscount})`, originalName: categoryName, rules: rules,
-                displayText: `-${discountAmount}`
-            });
-        }
-        const remainder = totalQuantity % buy_n;
-        const neededForNext = buy_n - remainder;
-        let subText = `已套用「${categoryName}」優惠`;
-        let promptText = null;
-        if (remainder > 0 && neededForNext > 0) {
-            promptText = `提示: 再購 ${neededForNext} 件可再享一次優惠`;
-            subText = promptText;
-        }
-        updateReceipt(promptText);
-        updateDisplay(subText);
-    }
-
-    function applyBuyXGetXMinus1(categoryId, categoryName, rules) {
-        const { target_category_id } = rules;
-        const eligibleItems = transactionItems.filter(item => {
-            if (target_category_id == 0) return item.price > 0 && item.category_type === 'product';
-            return item.category_id == target_category_id && item.price > 0;
-        });
-        if (eligibleItems.length === 0) {
-            const subText = `不符合「${categoryName}」活動資格`;
-            updateDisplay(subText);
-            updateReceipt(subText);
-            return;
-        }
-        const totalQuantity = eligibleItems.reduce((sum, item) => sum + item.quantity, 0);
-        transactionItems = transactionItems.filter(item => item.category_id !== categoryId);
-        if (totalQuantity < 2) {
-            const subText = `提示: ${categoryName} 至少需購買 2 件`;
-            updateDisplay(subText);
-            updateReceipt(subText);
-            return;
-        }
-        const itemsToDiscount = totalQuantity - 1;
-        const discountAmount = calculateDiscountFromCheapest(eligibleItems, itemsToDiscount);
-        if(discountAmount > 0) {
-            transactionItems.push({
-                price: -discountAmount, unitPrice: -discountAmount, quantity: 1,
-                category_id: categoryId, category_type: 'buy_x_get_x_minus_1',
-                categoryName: `${categoryName} (買${totalQuantity}送${itemsToDiscount})`, originalName: categoryName, rules: rules,
-                displayText: `-${discountAmount}`
-            });
-        }
-        const subText = `已套用「${categoryName}」優惠`;
-        updateReceipt();
-        updateDisplay(subText);
-    }
-
-    function applyProgressivePairDiscount(categoryId, categoryName, rules) {
-        const { target_category_id } = rules;
-        const eligibleItems = transactionItems.filter(item => {
-            if (target_category_id == 0) return item.price > 0 && item.category_type === 'product';
-            return item.category_id == target_category_id && item.price > 0;
-        });
-        const totalQuantity = eligibleItems.reduce((sum, item) => sum + item.quantity, 0);
-        transactionItems = transactionItems.filter(item => item.category_id !== categoryId);
-        if (totalQuantity === 0) {
-            const subText = `不符合「${categoryName}」活動資格`;
-            updateDisplay(subText);
-            updateReceipt(subText);
-            return;
-        }
-        let effectiveQuantity = totalQuantity;
-        let subText = `已套用「${categoryName}」優惠`;
-        let promptText = null;
-        if (totalQuantity % 2 === 0 && totalQuantity > 0) {
-            effectiveQuantity = totalQuantity - 1;
-            const targetItemName = eligibleItems.length > 0 ? `「${eligibleItems[0].categoryName}」`:"";
-            promptText = `提示: 再加購 1 件${targetItemName}可享更多優惠！`;
-            subText = promptText;
-        }
-        if (effectiveQuantity < 1) {
-            updateReceipt(promptText);
-            updateDisplay(subText);
-            return;
-        }
-        const paidCount = Math.ceil(effectiveQuantity / 2);
-        const freeCount = Math.floor(effectiveQuantity / 2);
-        const discountAmount = calculateDiscountFromCheapest(eligibleItems, freeCount);
-        if (discountAmount > 0) {
-            transactionItems.push({
-                price: -discountAmount, unitPrice: -discountAmount, quantity: 1,
-                category_id: categoryId, category_type: 'buy_odd_even',
-                categoryName: `${categoryName} (買${paidCount}送${freeCount})`, originalName: categoryName, rules: rules,
-                displayText: `-${discountAmount}`
-            });
-        }
-        updateReceipt(promptText);
-        updateDisplay(subText);
-    }
-
-    function calculateDiscountFromCheapest(items, count) {
-        const allIndividualItems = [];
-        items.forEach(item => {
-            for (let i = 0; i < item.quantity; i++) {
-                allIndividualItems.push({ unitPrice: item.unitPrice });
-            }
-        });
-        allIndividualItems.sort((a, b) => a.unitPrice - b.unitPrice);
-        return allIndividualItems.slice(0, count).reduce((sum, item) => sum + item.unitPrice, 0);
-    }
-
-    // =================================================================
-    // SECTION 4: 結帳與收據
-    // =================================================================
-
-    function enterPaymentMode() {
-        finalTotalForPayment = calculateCurrentTotal();
-        inPaymentMode = true;
-        isReadyForNewInput = true;
-        expression = [];
-        currentInput = '0';
-
-        document.querySelectorAll(".category-btn").forEach(btn => {
-            if (btn.dataset.type === 'discount_percent' || btn.dataset.type === 'other_income') {
-                btn.disabled = false;
+    updateDisplay(tx, subText = null) {
+        const mainVal = parseFloat(tx.currentInput) || 0;
+        if (this.displayMain) this.displayMain.innerText = mainVal.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        if (this.displayExpression) {
+            if (tx.inPaymentMode || tx.activeDiscountMode) {
+                this.displayExpression.innerText = `小計: ${tx.getCurrentTotal().toLocaleString('en-US')}`;
             } else {
-                btn.disabled = true;
+                const itemsText = tx.items.map(i => i.displayText).join(' + ');
+                const curExpr = [...tx.expression, (tx.currentInput !== '0' || tx.expression.length > 0) ? tx.currentInput : ''].join(' ');
+                const fullText = [itemsText, curExpr].filter(Boolean).join(' + ').replace(/\+ -/g, '- ');
+                this.displayExpression.innerText = fullText;
             }
-        });
-        updateDisplay();
-    }
-
-    function enterFinalPaymentStage() {
-        finalTotalForPayment = calculateCurrentTotal();
-        equalsBtn.style.display = 'none';
-        checkoutBtn.style.display = 'block';
-        document.querySelectorAll(".category-btn").forEach(btn => btn.disabled = true);
-        updateDisplay();
-    }
-
-    async function handleCheckout(paidAmount = null) {
-        const amountPaid = paidAmount ?? parseFloat(currentInput);
-        if (isNaN(amountPaid) || amountPaid < finalTotalForPayment) {
-            return updateDisplay(`金額不足，應收: ${finalTotalForPayment.toLocaleString('en-US')}`);
         }
-
-        const change = amountPaid - finalTotalForPayment;
-
-        const success = await sendTransactionToServer(transactionItems, amountPaid, change);
-
-        if (success) {
-            updateReceiptForCheckout(amountPaid, finalTotalForPayment);
-            finalizeTransaction(true, amountPaid, change);
-        } else {
-            finalizeTransaction(false, null, null);
+        if (this.displaySub) {
+            if (subText) this.displaySub.innerText = subText;
+            else if (tx.activeDiscountMode) this.displaySub.innerText = `請輸入折扣 (例如 9折 輸入 9)`;
+            else if (tx.inPaymentMode) this.displaySub.innerText = `應收: ${tx.finalTotalForPayment.toLocaleString()} / 實收: ${mainVal.toLocaleString()}`;
+            else this.displaySub.innerText = `小計: ${tx.getCurrentTotal().toLocaleString('en-US')}`;
         }
     }
 
-    function finalizeTransaction(success, paidAmount, changeReceived) {
-        isTransactionComplete = success;
-        if (success) {
-            currentInput = (paidAmount !== null) ? paidAmount.toString() : '0';
-            const changeText = (changeReceived !== null) ? `找零: ${changeReceived.toLocaleString('en-US')}` : '';
-            updateDisplay(changeText);
-        } else {
-            updateDisplay(`交易失敗`);
-        }
-        
-        // 交易完成後，重設所有狀態
-        if (isTransactionComplete) {
-            setTimeout(() => {
-                resetCalculator();
-            }, 1500);
-        }
-    }
-    
-    function updateReceipt(promptText = null) {
-        receiptDetails.className = '';
-        if (transactionItems.length === 0 && !promptText) {
-            receiptDetails.className = 'd-flex justify-content-center align-items-center h-100';
-            receiptDetails.innerHTML = '<span class="text-muted">暫無商品</span>';
+    updateReceipt(tx, promptText = null) {
+        if (!this.receiptDetails) return;
+        this.receiptDetails.className = '';
+        if (!tx.items.length && !promptText) {
+            this.receiptDetails.className = 'd-flex justify-content-center align-items-center h-100';
+            this.receiptDetails.innerHTML = '<span class="text-muted">暫無商品</span>';
             return;
         }
-
-        const isOtherIncome = transactionItems.length > 0 && transactionItems[0].category_type === 'other_income';
-        const headerTitle = isOtherIncome ? '項目' : '商品';
-
-        let headerHtml = `
-            <div class="receipt-line receipt-header">
-                <div class="flex-grow-1">${headerTitle}</div>
-                <div style="width: 50px;" class="text-center">數量</div>
-                <div style="width: 70px;" class="text-end">單價</div>
-                <div style="width: 80px;" class="text-end">金額</div>
-            </div>`;
-
-        let itemsHtml = transactionItems.map(item => {
-            const isProduct = item.category_type === 'product' && item.quantity > 0;
-            return `
-                <div class="receipt-line ${item.price < 0 ? 'text-danger' : ''}">
-                    <div class="flex-grow-1">${item.categoryName}</div>
-                    ${isProduct ? `
-                        <div style="width: 50px;" class="text-center">${item.quantity}</div>
-                        <div style="width: 70px;" class="text-end">${item.unitPrice.toLocaleString()}</div>
-                    ` : `
-                        <div style="width: 120px;"></div>
-                    `}
-                    <div style="width: 80px;" class="text-end fw-bold">${item.price.toLocaleString()}</div>
-                </div>`;
+        const isOther = tx.items.length && tx.items[0].category_type === 'other_income';
+        const hdr = `<div class="receipt-line receipt-header"><div class="flex-grow-1">${isOther ? '項目' : '商品'}</div><div style="width:50px" class="text-center">數量</div><div style="width:70px" class="text-end">單價</div><div style="width:80px" class="text-end">金額</div></div>`;
+        const itemsHtml = tx.items.map(item => {
+            const isProd = item.category_type === 'product' && item.quantity > 0;
+            return `<div class="receipt-line ${item.price < 0 ? 'text-danger' : ''}"><div class="flex-grow-1">${item.categoryName}</div>${isProd ? `<div style="width:50px" class="text-center">${item.quantity}</div><div style="width:70px" class="text-end">${item.unitPrice.toLocaleString()}</div>` : `<div style="width:120px"></div>`}<div style="width:80px" class="text-end fw-bold">${item.price.toLocaleString()}</div></div>`;
         }).join('');
+        this.receiptDetails.innerHTML = `<div>${hdr}<div class="item-list">${itemsHtml}</div></div>${promptText ? `<div class="receipt-prompt">${promptText}</div>` : ''}`;
+        this.receiptDetails.scrollTop = this.receiptDetails.scrollHeight;
+    }
 
-        let promptHtml = '';
-        if (promptText) {
-            promptHtml = `<div class="receipt-prompt">${promptText}</div>`;
+    updateReceiptForCheckout(tx, amountPaid) {
+        if (!this.receiptDetails) return;
+        const total = tx.finalTotalForPayment;
+        const pos = tx.items.filter(i => i.price > 0).reduce((s, i) => s + i.price, 0);
+        const discHtml = tx.items.filter(i => i.price < 0).map(d => `<div class="receipt-line"><span>${d.categoryName}</span><span class="text-danger">${d.price.toLocaleString()}</span></div>`).join('');
+        this.receiptDetails.className = 'd-flex flex-column h-100';
+        this.receiptDetails.innerHTML = `<div><div class="receipt-line"><span>商品總計</span><span class="fw-bold">${pos.toLocaleString()}</span></div></div><div class="flex-grow-1"></div><div class="pt-2">${discHtml}<hr class="my-1"><div class="receipt-line fw-bold"><span>應收金額</span><span>${total.toLocaleString()}</span></div><div class="receipt-line"><span>實收現金</span><span>${amountPaid.toLocaleString()}</span></div><div class="receipt-line"><span>找零</span><span>${(amountPaid - total).toLocaleString()}</span></div></div>`;
+    }
+
+    updateReceiptForOther(amount, title) {
+        if (!this.receiptDetails) return;
+        this.receiptDetails.className = 'd-flex justify-content-center align-items-center h-100';
+        this.receiptDetails.innerHTML = `<div class="text-center p-3"><h4 class="fw-bold mb-2">${title}</h4><p class="text-muted small mb-3">您的每一份支持，都是改變的力量</p><hr class="my-2"><div class="d-flex justify-content-center align-items-center fs-4 mt-3 px-3"><span class="text-success fw-bold me-2">NT$</span><span class="fw-bold">${amount.toLocaleString()}</span></div></div>`;
+    }
+
+    setCheckoutMode(isCheckout) {
+        if (this.equalsBtn) this.equalsBtn.style.display = isCheckout ? 'none' : 'block';
+        if (this.checkoutBtn) this.checkoutBtn.style.display = isCheckout ? 'block' : 'none';
+        document.querySelectorAll(".category-btn").forEach(btn => btn.disabled = isCheckout);
+    }
+
+    setCategoryButtonsState(disabledPercent) {
+        document.querySelectorAll(".category-btn").forEach(btn => btn.disabled = btn.dataset.type === 'discount_percent' ? disabledPercent : false);
+        document.querySelectorAll(".calc-btn").forEach(btn => btn.disabled = false);
+    }
+}
+
+class POSDiscountEngine {
+    constructor(tx) {
+        this.tx = tx;
+        this.autoDiscounts = window.AUTOMATED_DISCOUNTS || [];
+    }
+
+    evaluate() {
+        if (!this.autoDiscounts.length || this.tx.inPaymentMode) return;
+        this.tx.items = this.tx.items.filter(i => !['buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even', 'product_discount_percent'].includes(i.category_type));
+        this.autoDiscounts.forEach(d => {
+            if (d.type === 'buy_n_get_m') this._applyBuyN(d.id, d.name, d.rules);
+            else if (d.type === 'buy_x_get_x_minus_1') this._applyBuyX(d.id, d.name, d.rules);
+            else if (d.type === 'buy_odd_even') this._applyBuyOddEven(d.id, d.name, d.rules);
+            else if (d.type === 'product_discount_percent') this._applyProductPercent(d.id, d.name, d.rules);
+        });
+    }
+
+    _calc(items, count) {
+        const all = [];
+        items.forEach(i => { for(let j=0; j<i.quantity; j++) all.push(i.unitPrice); });
+        all.sort((a, b) => a - b);
+        return all.slice(0, count).reduce((s, a) => s + a, 0);
+    }
+
+    _filterEligible(targetId) {
+        return this.tx.items.filter(i => i.price > 0 && (targetId == 0 ? i.category_type === 'product' : i.category_id == targetId));
+    }
+
+    _applyBuyN(cid, cname, r) {
+        if (!r.buy_n || !r.get_m_free) return;
+        const e = this._filterEligible(r.target_category_id);
+        const t = e.reduce((s, i) => s + i.quantity, 0);
+        if (t < r.buy_n) return;
+        const amt = this._calc(e, Math.floor(t / r.buy_n) * r.get_m_free);
+        if (amt > 0) this.tx.items.push({price: -amt, unitPrice: -amt, quantity: 1, category_id: cid, category_type: 'buy_n_get_m', categoryName: `${cname} (買 ${r.buy_n} 送 ${r.get_m_free})`, displayText: `-${amt}`});
+    }
+
+    _applyBuyX(cid, cname, r) {
+        const e = this._filterEligible(r.target_category_id), t = e.reduce((s, i) => s + i.quantity, 0);
+        if (t < 2) return;
+        const amt = this._calc(e, t - 1);
+        if (amt > 0) this.tx.items.push({price: -amt, unitPrice: -amt, quantity: 1, category_id: cid, category_type: 'buy_x_get_x_minus_1', categoryName: `${cname} (買 ${t} 送 ${t - 1})`, displayText: `-${amt}`});
+    }
+
+    _applyBuyOddEven(cid, cname, r) {
+        const e = this._filterEligible(r.target_category_id), t = e.reduce((s, i) => s + i.quantity, 0);
+        if (t < 1) return;
+        const freeCount = Math.floor((t - 1) / 2);
+        const paidCount = t - freeCount;
+        const amt = this._calc(e, freeCount);
+        if (amt > 0) this.tx.items.push({price: -amt, unitPrice: -amt, quantity: 1, category_id: cid, category_type: 'buy_odd_even', categoryName: `${cname} (買 ${paidCount} 折 ${freeCount})`, displayText: `-${amt}`});
+    }
+
+    _applyProductPercent(cid, cname, r) {
+        if (!r.percent) return;
+        const e = this._filterEligible(r.target_category_id);
+        const t = e.reduce((s, i) => s + i.quantity, 0);
+        if (t < 1) return;
+        const mult = (r.percent < 10 && r.percent >= 1) ? r.percent / 10 : r.percent / 100;
+        const totalPrice = e.reduce((s, i) => s + (i.price), 0);
+        const discountAmt = Math.round(totalPrice * (1 - mult));
+        if (discountAmt > 0) {
+            this.tx.items.push({
+                price: -discountAmt, unitPrice: -discountAmt, quantity: 1, 
+                category_id: cid, category_type: 'product_discount_percent', 
+                categoryName: `${cname} (${r.percent}折)`, displayText: `-${discountAmt}`
+            });
         }
-
-        receiptDetails.innerHTML = `<div>${headerHtml}<div class="item-list">${itemsHtml}</div></div>${promptHtml}`;
-        receiptDetails.scrollTop = receiptDetails.scrollHeight;
-    }
-    
-    function updateReceiptForCheckout(amountPaid, transactionTotal) {
-        receiptDetails.className = 'd-flex flex-column h-100';
-        
-        const positiveItemsTotal = transactionItems.filter(item => item.price > 0).reduce((sum, item) => sum + item.price, 0);
-        const allDiscounts = transactionItems.filter(item => item.price < 0);
-        
-        const discountHtml = allDiscounts.map(slot =>
-            `<div class="receipt-line">
-                <span>${slot.categoryName}</span>
-                <span class="text-danger">${slot.price.toLocaleString()}</span>
-            </div>`
-        ).join('');
-
-        receiptDetails.innerHTML = `
-            <div>
-                <div class="receipt-line">
-                    <span>商品總計</span>
-                    <span class="fw-bold">${positiveItemsTotal.toLocaleString()}</span>
-                </div>
-            </div>
-            <div class="flex-grow-1"></div>
-            <div class="pt-2">
-                ${discountHtml}
-                <hr class="my-1">
-                <div class="receipt-line fw-bold">
-                    <span>應收金額</span>
-                    <span>${transactionTotal.toLocaleString()}</span>
-                </div>
-                <div class="receipt-line">
-                    <span>實收現金</span>
-                    <span>${amountPaid.toLocaleString()}</span>
-                </div>
-                <div class="receipt-line">
-                    <span>找零</span>
-                    <span>${(amountPaid - transactionTotal).toLocaleString()}</span>
-                </div>
-            </div>`;
-    }
-    
-    function updateReceiptForOtherIncome(amount, title) {
-        receiptDetails.className = 'd-flex justify-content-center align-items-center h-100';
-        receiptDetails.innerHTML = `
-            <div class="text-center p-3">
-                <h4 class="fw-bold mb-2">${title}</h4>
-                <p class="text-muted small mb-3">您的每一份支持，都是改變的力量</p>
-                <hr class="my-2">
-                <div class="d-flex justify-content-center align-items-center fs-4 mt-3 px-3">
-                    <span class="text-success fw-bold me-2">NT$</span>
-                    <span class="fw-bold">${amount.toLocaleString()}</span>
-                </div>
-            </div>`;
     }
 
-    // =================================================================
-    // SECTION 5: 伺服器通訊
-    // =================================================================
-    // 修正點：將 items 作為參數傳入，以避免非同步問題
-    async function sendTransactionToServer(items, paidAmount, changeReceived) {
-        const expandedItems = [];
-        items.forEach(item => {
-            for (let i = 0; i < item.quantity; i++) {
-                expandedItems.push({ price: item.unitPrice, category_id: item.category_id });
+    getHint(pid) {
+        let match = this.autoDiscounts.filter(d => d.rules.target_category_id == 0 || d.rules.target_category_id == pid);
+        if (!match.length) return null;
+        let hints = [];
+        match.forEach(d => {
+            const e = this._filterEligible(d.rules.target_category_id);
+            const t = e.reduce((s, i) => s + i.quantity, 0);
+            if (d.type === 'buy_n_get_m') {
+                const req = d.rules.buy_n;
+                const rem = t % req;
+                if (t === 0 || rem > 0) hints.push(`${d.name}：再買 ${req - rem} 件即享買 ${req} 送 ${d.rules.get_m_free}`);
+                else hints.push(`已滿件：${d.name} (買 ${req} 送 ${d.rules.get_m_free})`);
+            } else if (d.type === 'buy_x_get_x_minus_1') {
+                if (t < 2) hints.push(`${d.name}：再買 1 件即可享優惠`);
+                else hints.push(`已套用：${d.name} (買 ${t} 送 ${t - 1})`);
+            } else if (d.type === 'buy_odd_even') {
+                const freeCount = Math.floor((t - 1) / 2);
+                const paidCount = t - freeCount;
+                if (t % 2 !== 0 && t >= 3) {
+                    hints.push(`已滿件：${d.name} (買 ${paidCount} 折 ${freeCount})`);
+                } else {
+                    let nextTarget = 3;
+                    if (t > 0) nextTarget = (t % 2 === 0) ? t + 1 : t + 2;
+                    const diff = nextTarget - t;
+                    const nextFree = Math.floor((nextTarget - 1) / 2);
+                    const nextPaid = nextTarget - nextFree;
+                    if (t === 0) hints.push(`${d.name}：享有買 ${nextPaid} 折 ${nextFree} 優惠`);
+                    else hints.push(`${d.name}：再買 ${diff} 件，即可買 ${nextPaid} 折 ${nextFree}`);
+                }
+            } else if (d.type === 'product_discount_percent') {
+                if (t > 0) hints.push(`已自動套用：${d.name} (${d.rules.percent}折)`);
+                else hints.push(`${d.name}：隨意搭配即享 ${d.rules.percent}折`);
             }
         });
-        
+        return hints.length ? hints.join('，') : null;
+    }
+}
+
+class POSController {
+    constructor() {
+        this.tx = new POSTransaction();
+        this.ui = new POSUIManager();
+        this.discountEngine = new POSDiscountEngine(this.tx);
+        document.querySelectorAll('.category-btn').forEach(b => b.addEventListener('click', () => this.handleCategoryClick(b)));
+        const dBtn = document.getElementById("donation-btn"), oBtn = document.getElementById("other-income-btn");
+        if (dBtn) dBtn.addEventListener('click', () => this.handleCategoryClick({ dataset: { id: dBtn.dataset.id, name: dBtn.dataset.name, type: 'other_income', rules: '{}' } }));
+        if (oBtn) oBtn.addEventListener('click', () => this.handleCategoryClick({ dataset: { id: oBtn.dataset.id, name: oBtn.dataset.name, type: 'other_income', rules: '{}' } }));
+        this.reset();
+        console.log("[POS] Object-Oriented App Initialized.");
+    }
+
+    reset() {
+        this.tx.reset();
+        this.ui.setCategoryButtonsState(true);
+        this.ui.setCheckoutMode(false);
+        this.ui.updateReceipt(this.tx);
+        this.ui.updateDisplay(this.tx);
+    }
+
+    _chkReset() { if (this.tx.isComplete) { this.reset(); return true; } return false; }
+
+    handleNumber(v) {
+        if (this._chkReset()) { this.handleNumber(v); return; }
+        if (this.tx.isReadyForNewInput) { this.tx.currentInput = v === '.' ? '0.' : v; this.tx.isReadyForNewInput = false; }
+        else {
+            if (this.tx.currentInput === '0' && v !== '.' && v !== '00') this.tx.currentInput = v;
+            else if (v === '.' && this.tx.currentInput.includes('.')) return;
+            else if (this.tx.currentInput.length < 14) this.tx.currentInput += v;
+        }
+        this.ui.updateDisplay(this.tx);
+    }
+
+    handleOperator(op) {
+        if (this._chkReset() || this.tx.inPaymentMode || this.tx.activeDiscountMode) return;
+        this.tx.expression.push(this.tx.currentInput);
+        this.tx.expression.push(op);
+        this.tx.currentInput = '0';
+        this.tx.isReadyForNewInput = true;
+        this.ui.updateDisplay(this.tx);
+    }
+
+    handleBackspace() {
+        this.tx.currentInput = this.tx.currentInput.length > 1 ? this.tx.currentInput.slice(0, -1) : '0';
+        this.ui.updateDisplay(this.tx);
+    }
+
+    handleUndo() {
+        if (this.tx.inPaymentMode || this.tx.activeDiscountMode) return;
+        if (this.tx.currentInput !== '0' || this.tx.expression.length > 0) Object.assign(this.tx, {currentInput: '0', expression: []});
+        else if (this.tx.items.length > 0) { this.tx.items.pop(); this.discountEngine.evaluate(); }
+        this.ui.setCheckoutMode(false);
+        this.ui.updateReceipt(this.tx);
+        this.ui.updateDisplay(this.tx);
+    }
+
+    handleEquals() {
+        if (this._chkReset()) return;
+        if (this.tx.activeDiscountMode) {
+            this._applyPercent(); this.discountEngine.evaluate();
+        } else if (!this.tx.inPaymentMode) {
+            const val = safeCalculate([...this.tx.expression, this.tx.currentInput].join(' '));
+            if (val > 0) this.tx.items.push({price: val, unitPrice: val, quantity: 1, category_id: null, category_type: 'product', categoryName: "手動輸入", displayText: val.toString()});
+            Object.assign(this.tx, {expression: [], currentInput: '0', finalTotalForPayment: this.tx.getCurrentTotal(), inPaymentMode: true, isReadyForNewInput: true});
+            this.ui.setCheckoutMode(true);
+            this.ui.updateDisplay(this.tx);
+            this.ui.updateReceipt(this.tx);
+        } else this.handleCheckout();
+    }
+
+    handleCategoryClick(btn) {
+        if (this._chkReset()) { this.handleCategoryClick(btn); return; }
+        const cId = btn.dataset.id, cName = btn.dataset.name, cType = btn.dataset.type, raw = btn.dataset.rules;
+        const r = (() => { try { return JSON.parse(!raw || raw === 'None' || raw === 'undefined' ? '{}' : raw); } catch(e){ return {}; } })();
+        if (cType === 'discount_percent') { this.tx.activeDiscountMode = { id: cId, name: cName, rules: r }; this.tx.currentInput = '0'; this.tx.isReadyForNewInput = true; this.ui.updateDisplay(this.tx); return; }
+        if (this.tx.inPaymentMode) return;
+        if (cType === 'other_income') { this._applyOther(cId, cName); return; }
+        if (cType === 'product') this._applyProduct(cId, cName);
+        else if (cType === 'discount_fixed') this._applyFixed(cId, cName);
+    }
+
+    _applyProduct(cId, cName) {
+        const val = safeCalculate([...this.tx.expression, this.tx.currentInput].join(' '));
+        if (val <= 0) { this.ui.updateDisplay(this.tx, "請先輸入金額"); return; }
+        let qty = 1, uPrice = val, dText = val.toString(), exprStr = [...this.tx.expression, this.tx.currentInput].join('');
+        if (exprStr.includes('*') && !exprStr.match(/[+\-\/]/)) {
+            const p = exprStr.split('*'); qty = parseInt(safeCalculate(p[0])) || 1; uPrice = safeCalculate(p[1]); dText = `${qty}*${uPrice}`;
+        }
+        this.tx.items.push({price: qty * uPrice, unitPrice: uPrice, quantity: qty, category_id: cId, category_type: 'product', categoryName: cName, displayText: dText});
+        Object.assign(this.tx, {expression: [], currentInput: '0'});
+        this.ui.setCategoryButtonsState(false); this.ui.setCheckoutMode(false);
+        this.discountEngine.evaluate();
+        const hint = this.discountEngine.getHint(cId);
+        this.ui.updateReceipt(this.tx, hint);
+        this.ui.updateDisplay(this.tx, hint);
+    }
+
+    _applyFixed(cId, cName) {
+        const val = safeCalculate([...this.tx.expression, this.tx.currentInput].join(' '));
+        if (val <= 0) return;
+        this.tx.items.push({price: -val, unitPrice: -val, quantity: 1, category_id: cId, category_type: 'discount_fixed', categoryName: `${cName} -${val}`, displayText: `-${val}`});
+        Object.assign(this.tx, {expression: [], currentInput: '0'}); this.discountEngine.evaluate();
+        this.ui.updateReceipt(this.tx); this.ui.updateDisplay(this.tx);
+    }
+
+    _applyPercent() {
+        if (!this.tx.activeDiscountMode) return;
+        const dVal = parseFloat(this.tx.currentInput);
+        if (isNaN(dVal) || dVal <= 0 || dVal >= 10) { this.ui.updateDisplay(this.tx, "折扣值需介於 0 和 10 之間"); this.tx.activeDiscountMode = null; this.tx.currentInput = '0'; return; }
+        const { id, name } = this.tx.activeDiscountMode;
+        const tot = this.tx.items.reduce((s, i) => s + (i.price > 0 ? i.price : 0), 0), dAmt = -(tot * (1 - dVal / 10));
+        this.tx.items = this.tx.items.filter(i => i.category_id !== id);
+        if (dAmt < 0) this.tx.items.push({price: dAmt, unitPrice: dAmt, quantity: 1, category_id: id, category_type: 'discount_percent', categoryName: `${name} ${dVal}折`, displayText: `${dAmt.toFixed(0)}`});
+        Object.assign(this.tx, {activeDiscountMode: null, currentInput: '0', inPaymentMode: false});
+        this.ui.setCheckoutMode(false); this.ui.updateReceipt(this.tx); this.ui.updateDisplay(this.tx);
+    }
+
+    async _applyOther(cId, cName) {
+        const val = safeCalculate([...this.tx.expression, this.tx.currentInput].join(' '));
+        if (val <= 0) { this.ui.updateDisplay(this.tx, "金額必須大於 0"); return; }
+        const i = [{price: val, unitPrice: val, quantity: 1, category_id: cId, category_type: 'other_income', categoryName: cName, displayText: val.toString()}];
+        const ok = await this._sendTrans(i, val, 0);
+        if (ok) { this.ui.updateReceiptForOther(val, cName); this._finalize(true, val, 0); } else this._finalize(false, null, null);
+    }
+
+    async handleCheckout(pAmnt = null) {
+        const p = (pAmnt !== null && pAmnt !== undefined) ? pAmnt : parseFloat(this.tx.currentInput);
+        if (isNaN(p) || p < this.tx.finalTotalForPayment) { this.ui.updateDisplay(this.tx, `金額不足，應收: ${this.tx.finalTotalForPayment.toLocaleString()}`); return; }
+        const chg = p - this.tx.finalTotalForPayment, ok = await this._sendTrans(this.tx.items, p, chg);
+        if (ok) { this.ui.updateReceiptForCheckout(this.tx, p); this._finalize(true, p, chg); } else this._finalize(false, null, null);
+    }
+
+    _finalize(ok, pAmnt, chg) {
+        this.tx.isComplete = ok;
+        if (ok) { this.tx.currentInput = pAmnt !== null ? pAmnt.toString() : '0'; this.ui.updateDisplay(this.tx, chg !== null ? `找零: ${chg.toLocaleString()}` : ''); }
+        else this.ui.updateDisplay(this.tx, "交易失敗");
+        if (this.tx.isComplete) setTimeout(() => this.reset(), 1500);
+    }
+
+    async _sendTrans(items, paidAmount, chgRec) {
+        const exp = []; items.forEach(it => { for (let i = 0; i < it.quantity; i++) exp.push({ price: it.unitPrice, category_id: it.category_id }); });
         try {
-            const response = await fetch("/cashier/record_transaction", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    location_slug: POS_LOCATION_SLUG, 
-                    items: expandedItems,
-                    cash_received: paidAmount,
-                    change_given: changeReceived
-                }),
-            });
-
-            if (!response.ok) throw new Error("網路回應不正確");
-
-            const result = await response.json();
-            if (result.success) {
-                updateDashboardTotals(
-                    result.total_sales,
-                    result.total_transactions,
-                    result.total_items,
-                    result.donation_total,
-                    result.other_total
-                );
-                return true;
-            } else {
-                updateDisplay(`傳送失敗: ${result.error}`);
-                return false;
-            }
-        } catch (error) {
-            console.error("結帳時發生錯誤:", error);
-            updateDisplay("傳送失敗");
-            return false;
-        }
+            const resp = await fetch("/cashier/record_transaction", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location_slug: typeof POS_LOCATION_SLUG !== 'undefined' ? POS_LOCATION_SLUG : '', items: exp, cash_received: paidAmount, change_given: chgRec }) });
+            if (!resp.ok) throw new Error("Network response was not ok");
+            const res = await resp.json();
+            if (res.success) { this.ui.updateDashboardTotals(res.total_sales, res.total_transactions, res.total_items, res.donation_total, res.other_total); return true; }
+            else { this.ui.updateDisplay(this.tx, `傳送失敗: ${res.error}`); return false; }
+        } catch (e) { console.error("[POS] Checkout error:", e); this.ui.updateDisplay(this.tx, "傳送失敗"); return false; }
     }
-    
-    // =================================================================
-    // SECTION 6: 初始化與事件綁定
-    // =================================================================
+}
 
-    document.querySelectorAll(".number-btn").forEach(btn => btn.addEventListener('click', () => handleNumber(btn.dataset.value)));
-    document.querySelectorAll(".operator-btn").forEach(btn => btn.addEventListener('click', () => handleOperator(btn.dataset.value)));
-    
-    document.querySelector('[data-action="clear"]').addEventListener('click', resetCalculator);
-    document.querySelector('[data-action="undo"]').addEventListener('click', handleUndo);
-    document.querySelector('[data-action="backspace"]').addEventListener('click', () => {
-        if (currentInput.length > 1) currentInput = currentInput.slice(0, -1);
-        else currentInput = '0';
-        updateDisplay();
-    });
-
-    equalsBtn.addEventListener('click', handleEquals);
-    checkoutBtn.addEventListener('click', () => handleCheckout());
-
-    // 修正點：修復硬編碼按鈕的事件監聽器，讓它們正確呼叫 handleCategoryClick
-    const donationBtn = document.getElementById("donation-btn");
-    if (donationBtn) {
-      donationBtn.addEventListener('click', () => {
-        // 這裡需要從按鈕的屬性中提取 id 和 name
-        const categoryId = donationBtn.dataset.id;
-        const categoryName = donationBtn.dataset.name;
-        // 如果沒有這些屬性，則需要先在 HTML 中添加
-        if (!categoryId || !categoryName) {
-           console.error("捐款按鈕缺少 data-id 或 data-name 屬性");
-           return;
-        }
-        // 構造一個模擬的按鈕物件來呼叫 handleCategoryClick
-        handleCategoryClick({ dataset: { id: categoryId, name: categoryName, type: 'other_income', rules: '{}' } });
-      });
-    }
-
-    const otherIncomeBtn = document.getElementById("other-income-btn");
-    if (otherIncomeBtn) {
-      otherIncomeBtn.addEventListener('click', () => {
-        const categoryId = otherIncomeBtn.dataset.id;
-        const categoryName = otherIncomeBtn.dataset.name;
-        if (!categoryId || !categoryName) {
-           console.error("其他收入按鈕缺少 data-id 或 data-name 屬性");
-           return;
-        }
-        handleCategoryClick({ dataset: { id: categoryId, name: categoryName, type: 'other_income', rules: '{}' } });
-      });
-    }
-
-    resetCalculator();
+window.posApp = null;
+document.addEventListener("DOMContentLoaded", () => {
+    window.posApp = new POSController();
+    window.posNum   = (v) => window.posApp.handleNumber(v);
+    window.posOp    = (v) => window.posApp.handleOperator(v);
+    window.posClear = () => window.posApp.tx.isComplete ? window.posApp.reset() : window.posApp.reset();
+    window.posUndo  = () => window.posApp.handleUndo();
+    window.posBack  = () => window.posApp.handleBackspace();
+    window.posEquals   = () => window.posApp.handleEquals();
+    window.posCheckout = () => window.posApp.handleCheckout();
 });

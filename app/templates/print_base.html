@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}報表{% endblock %}</title>
+    <style>
+        /* ===================================================
+         * 5 Way House - 統一列印樣式表 (print_base.html)
+         * 所有列印頁面均繼承自此樣式，請勿在子模板重複定義。
+         * =================================================== */
+        @page {
+            size: A4 portrait;
+            margin: 2cm;
+        }
+        :root {
+            --table-border-width: 1px;
+            --signature-line-width: 1px;
+            --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-mono: 'Courier New', Courier, monospace;
+            --color-border: #dee2e6;
+            --color-muted: #6c757d;
+            --color-danger: #dc3545;
+            --color-heading-border: #343a40;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--font-sans);
+            font-size: 11pt;
+            color: #212529;
+            background: #fff;
+        }
+        .print-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* --- 頁面標題區 --- */
+        .print-header {
+            margin-bottom: 1rem;
+        }
+        .print-header h1 {
+            font-size: 22pt;
+            font-weight: bold;
+            margin: 0 0 0.25rem 0;
+            text-align: center;
+        }
+        .print-header p {
+            font-size: 10pt;
+            color: var(--color-muted);
+            margin: 0;
+            text-align: center;
+        }
+        .print-header hr {
+            border: 0;
+            border-top: 2px solid var(--color-heading-border);
+            margin: 0.75rem 0 1.5rem 0;
+        }
+
+        /* --- 分節標題 --- */
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        /* --- 通用報表表格 --- */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+        .report-table td,
+        .report-table th {
+            border: var(--table-border-width) solid var(--color-border);
+            padding: 0.5rem 0.6rem;
+            vertical-align: middle;
+        }
+        .report-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            text-align: left;
+        }
+        .report-table .currency-col {
+            width: 3ch;
+            text-align: center;
+            padding-right: 0.1rem;
+            font-family: var(--font-mono);
+        }
+        .report-table .amount-col {
+            width: 12ch;
+            text-align: right;
+            font-family: var(--font-mono);
+            padding-left: 0.1rem;
+        }
+        .report-table .label-col {
+            width: 75%;
+        }
+
+        /* --- 簽核欄 --- */
+        .signature-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px 0;
+            margin-top: 2rem;
+            border: var(--table-border-width) solid var(--color-border);
+            border-radius: 4px;
+            padding: 5px;
+        }
+        .signature-table td {
+            border: 0;
+            position: relative;
+        }
+        .signature-table td + td::before {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: -5px;
+            bottom: 10%;
+            width: var(--table-border-width);
+            background-color: var(--color-border);
+        }
+        .signature-table .signature-cell {
+            width: 33.33%;
+            height: 100px;
+            border-bottom: var(--signature-line-width) solid #000;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .signature-table .signature-img {
+            max-width: 100%;
+            max-height: 90px;
+            height: auto;
+        }
+        .signature-table .title-cell {
+            width: 33.33%;
+            text-align: center;
+            padding-top: 0.5rem;
+            font-size: 10pt;
+            color: var(--color-muted);
+        }
+
+        /* --- 工具類別 --- */
+        .text-danger { color: var(--color-danger) !important; }
+        .fw-bold { font-weight: bold !important; }
+        .fw-bolder { font-weight: 800 !important; }
+        .text-center { text-align: center !important; }
+        .text-muted { color: var(--color-muted) !important; }
+
+        /* --- 列印時隱藏不必要的元素 --- */
+        @media print {
+            .no-print { display: none !important; }
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <div class="print-container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

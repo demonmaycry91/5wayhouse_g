@@ -26,16 +26,7 @@
 
 {# --- Flash 訊息顯示區塊 --- #}
 {# 這是 Flask 的標準作法，用來顯示從後端透過 flash() 函式傳來的臨時訊息 (例如 "操作成功" 或 "錯誤") #}
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-{% for category, message in messages %}
-<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-    {{ message }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endfor %}
-{% endif %}
-{% endwith %}
+
 
 {# --- 帳務核對卡片 --- #}
 <div class="card">
@@ -123,7 +114,7 @@
                         type="text" class="form-control signature-input" style="display:none;"
                         placeholder="請在此輸入姓名"></div>
                 <div class="mt-2">
-                    <button type="button" class="btn btn-sm btn-secondary toggle-btn">切換打字</button>
+                    <button type="button" class="btn btn-sm btn-secondary toggle-btn me-2">切換打字</button>
                     <button type="button" class="btn btn-sm btn-outline-danger clear-btn">清除</button>
                 </div>
             </div>
@@ -132,18 +123,20 @@
                 <div class="signature-container border rounded"><canvas class="signature-canvas"></canvas><input
                         type="text" class="form-control signature-input" style="display:none;"
                         placeholder="請在此輸入姓名"></div>
-                <div class="mt-2"><button type="button"
-                        class="btn btn-sm btn-secondary toggle-btn">切換打字</button><button type="button"
-                        class="btn btn-sm btn-outline-danger clear-btn">清除</button></div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-secondary toggle-btn me-2">切換打字</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger clear-btn">清除</button>
+                </div>
             </div>
             <div class="col-12 col-md-4 mb-3">
                 <label class="form-label">出納員</label>
                 <div class="signature-container border rounded"><canvas class="signature-canvas"></canvas><input
                         type="text" class="form-control signature-input" style="display:none;"
                         placeholder="請在此輸入姓名"></div>
-                <div class="mt-2"><button type="button"
-                        class="btn btn-sm btn-secondary toggle-btn">切換打字</button><button type="button"
-                        class="btn btn-sm btn-outline-danger clear-btn">清除</button></div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-secondary toggle-btn me-2">切換打字</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger clear-btn">清除</button>
+                </div>
             </div>
         </div>
     </div>
