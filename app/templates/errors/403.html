@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}5 Way House - 錯誤 403{% endblock %}
+
+{% block content %}
+<div class="row align-items-center justify-content-center" style="min-height: 60vh;">
+    <div class="col-md-6 text-center">
+        <h1 class="display-1 fw-bold text-danger">403</h1>
+        <h2 class="mb-4">權限不足</h2>
+        <p class="text-muted mb-4">很抱歉，您目前的帳號沒有存取此頁面的權限。如果您認為這是一個錯誤，請聯絡系統管理員。</p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill px-4">
+            返回主頁
+        </a>
+    </div>
+</div>
+{% endblock %}

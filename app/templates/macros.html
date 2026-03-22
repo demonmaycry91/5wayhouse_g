@@ -1,8 +1,10 @@
 {# app/templates/macros.html #}
-{% macro page_header(title, subtitle=None, button_url=None, button_text=None) %}
+{% macro page_header(title, subtitle=None, button_url=None, button_text=None, icon=None) %}
 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
     <div>
-        <h2 class="mb-0">{{ title | safe }}</h2>
+        <h2 class="mb-0">
+            {% if icon %}<i class="bi {{ icon }} me-2"></i>{% endif %}{{ title | safe }}
+        </h2>
         {% if subtitle %}
             <p class="text-muted mb-0 mt-1">{{ subtitle | safe }}</p>
         {% else %}
