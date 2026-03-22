@@ -76,7 +76,7 @@ def require_permission(perm):
                 flash(f"存取遭拒：您不具備報表模組的進階權限。 ({perm})", "danger")
                 return redirect(url_for('main.index'))
             return f(*args, **kwargs)
-        return decorator
+        return decorated_function
     return decorator
 
 class ReportQueryAuthorizedView(MethodView):
@@ -623,14 +623,14 @@ class QueryStatusAPIView(ReportQueryAuthorizedView):
 # ==========================================
 # Route Registrations
 # ==========================================
-bp.add_url_rule('/query', view_func=ReportQueryView.as_view('query'))
-bp.add_url_rule('/save_daily_summary_data', view_func=SaveDailySummaryDataView.as_view('save_daily_summary_data'))
-bp.add_url_rule('/save_cash_check_data', view_func=SaveCashCheckDataView.as_view('save_cash_check_data'))
-bp.add_url_rule('/save_transaction_log_data', view_func=SaveTransactionLogDataView.as_view('save_transaction_log_data'))
-bp.add_url_rule('/save_daily_cash_summary_data', view_func=SaveDailyCashSummaryDataView.as_view('save_daily_cash_summary_data'))
-bp.add_url_rule('/export_csv', view_func=ExportCSVView.as_view('export_csv'))
-bp.add_url_rule('/settlement', view_func=SettlementView.as_view('settlement'))
-bp.add_url_rule('/save_settlement', view_func=SaveSettlementView.as_view('save_settlement'))
-bp.add_url_rule('/settlement/print/<date_str>', view_func=PrintSettlementView.as_view('print_settlement'))
-bp.add_url_rule('/api/settlement_status', view_func=SettlementStatusAPIView.as_view('settlement_status_api'))
-bp.add_url_rule('/api/query_status', view_func=QueryStatusAPIView.as_view('query_status_api'))
+bp.add_url_rule('/query', endpoint='query', view_func=ReportQueryView.as_view('query'))
+bp.add_url_rule('/save_daily_summary_data', endpoint='save_daily_summary_data', view_func=SaveDailySummaryDataView.as_view('save_daily_summary_data'))
+bp.add_url_rule('/save_cash_check_data', endpoint='save_cash_check_data', view_func=SaveCashCheckDataView.as_view('save_cash_check_data'))
+bp.add_url_rule('/save_transaction_log_data', endpoint='save_transaction_log_data', view_func=SaveTransactionLogDataView.as_view('save_transaction_log_data'))
+bp.add_url_rule('/save_daily_cash_summary_data', endpoint='save_daily_cash_summary_data', view_func=SaveDailyCashSummaryDataView.as_view('save_daily_cash_summary_data'))
+bp.add_url_rule('/export_csv', endpoint='export_csv', view_func=ExportCSVView.as_view('export_csv'))
+bp.add_url_rule('/settlement', endpoint='settlement', view_func=SettlementView.as_view('settlement'))
+bp.add_url_rule('/save_settlement', endpoint='save_settlement', view_func=SaveSettlementView.as_view('save_settlement'))
+bp.add_url_rule('/settlement/print/<date_str>', endpoint='print_settlement', view_func=PrintSettlementView.as_view('print_settlement'))
+bp.add_url_rule('/api/settlement_status', endpoint='settlement_status_api', view_func=SettlementStatusAPIView.as_view('settlement_status_api'))
+bp.add_url_rule('/api/query_status', endpoint='query_status_api', view_func=QueryStatusAPIView.as_view('query_status_api'))

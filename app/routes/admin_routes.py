@@ -48,7 +48,7 @@ def require_permission(perm):
                 flash(f"存取遭拒：您不具備此系統管理模組的權限。 ({perm})", "danger")
                 return redirect(url_for('main.index'))
             return f(*args, **kwargs)
-        return decorator
+        return decorated_function
     return decorator
 
 class AdminLocationsView(MethodView):
@@ -486,7 +486,7 @@ class SystemSettingsView(AdminBaseView):
         form.backup_frequency.data = SystemSetting.get('instance_backup_frequency', 'off')
         form.backup_interval_minutes.data = int(SystemSetting.get('instance_backup_interval_minutes', '60'))
 
-        is_connected = GoogleIntegrationService.is_authorized()
+        is_connected = bool(GoogleIntegrationService.get_google_creds(current_app))
         drive_account_email = None
         if is_connected:
             user_info = GoogleIntegrationService.get_drive_user_info(current_app)
@@ -539,30 +539,30 @@ class ManualInstanceBackupView(AdminSystemView):
 # ==========================================
 # Route Registrations
 # ==========================================
-bp.add_url_rule('/locations', view_func=LocationListView.as_view('list_locations'))
-bp.add_url_rule('/locations/add', view_func=LocationAddView.as_view('add_location'))
-bp.add_url_rule('/locations/<int:location_id>/edit', view_func=LocationEditView.as_view('edit_location'))
-bp.add_url_rule('/locations/<int:location_id>/delete', view_func=LocationDeleteView.as_view('delete_location'))
+bp.add_url_rule('/locations', endpoint='list_locations', methods=['GET'], view_func=LocationListView.as_view('list_locations'))
+bp.add_url_rule('/locations/add', endpoint='add_location', methods=['GET', 'POST'], view_func=LocationAddView.as_view('add_location'))
+bp.add_url_rule('/locations/<int:location_id>/edit', endpoint='edit_location', methods=['GET', 'POST'], view_func=LocationEditView.as_view('edit_location'))
+bp.add_url_rule('/locations/<int:location_id>/delete', endpoint='delete_location', methods=['POST'], view_func=LocationDeleteView.as_view('delete_location'))
 
-bp.add_url_rule('/locations/<int:location_id>/categories', view_func=CategoryListView.as_view('list_categories'))
-bp.add_url_rule('/locations/<int:location_id>/categories/add', view_func=CategoryAddView.as_view('add_category'))
-bp.add_url_rule('/categories/<int:category_id>/edit', view_func=CategoryEditView.as_view('edit_category'))
-bp.add_url_rule('/categories/<int:category_id>/delete', view_func=CategoryDeleteView.as_view('delete_category'))
+bp.add_url_rule('/locations/<int:location_id>/categories', endpoint='list_categories', methods=['GET', 'POST'], view_func=CategoryListView.as_view('list_categories'))
+bp.add_url_rule('/locations/<int:location_id>/categories/add', endpoint='add_category', methods=['POST'], view_func=CategoryAddView.as_view('add_category'))
+bp.add_url_rule('/categories/<int:category_id>/edit', endpoint='edit_category', methods=['POST'], view_func=CategoryEditView.as_view('edit_category'))
+bp.add_url_rule('/categories/<int:category_id>/delete', endpoint='delete_category', methods=['POST'], view_func=CategoryDeleteView.as_view('delete_category'))
 
-bp.add_url_rule('/users', view_func=UserListView.as_view('list_users'))
-bp.add_url_rule('/users/add', view_func=UserAddView.as_view('add_user'))
-bp.add_url_rule('/users/<int:user_id>/edit', view_func=UserEditView.as_view('edit_user'))
-bp.add_url_rule('/users/<int:user_id>/delete', view_func=UserDeleteView.as_view('delete_user'))
+bp.add_url_rule('/users', endpoint='list_users', methods=['GET'], view_func=UserListView.as_view('list_users'))
+bp.add_url_rule('/users/add', endpoint='add_user', methods=['GET', 'POST'], view_func=UserAddView.as_view('add_user'))
+bp.add_url_rule('/users/<int:user_id>/edit', endpoint='edit_user', methods=['GET', 'POST'], view_func=UserEditView.as_view('edit_user'))
+bp.add_url_rule('/users/<int:user_id>/delete', endpoint='delete_user', methods=['POST'], view_func=UserDeleteView.as_view('delete_user'))
 
-bp.add_url_rule('/roles', view_func=RoleListView.as_view('list_roles'))
-bp.add_url_rule('/roles/add', view_func=RoleAddView.as_view('add_role'))
-bp.add_url_rule('/roles/<int:role_id>/edit', view_func=RoleEditView.as_view('edit_role'))
-bp.add_url_rule('/roles/<int:role_id>/delete', view_func=RoleDeleteView.as_view('delete_role'))
+bp.add_url_rule('/roles', endpoint='list_roles', methods=['GET'], view_func=RoleListView.as_view('list_roles'))
+bp.add_url_rule('/roles/add', endpoint='add_role', methods=['GET', 'POST'], view_func=RoleAddView.as_view('add_role'))
+bp.add_url_rule('/roles/<int:role_id>/edit', endpoint='edit_role', methods=['GET', 'POST'], view_func=RoleEditView.as_view('edit_role'))
+bp.add_url_rule('/roles/<int:role_id>/delete', endpoint='delete_role', methods=['POST'], view_func=RoleDeleteView.as_view('delete_role'))
 
-bp.add_url_rule('/force_close_day/<int:business_day_id>', view_func=ForceCloseDayView.as_view('force_close_day'))
-bp.add_url_rule('/force_close_day/new', view_func=NewForceCloseDayView.as_view('new_force_close_day'))
-bp.add_url_rule('/force_close_query', view_func=ForceCloseQueryView.as_view('force_close_query'))
+bp.add_url_rule('/force_close_day/<int:business_day_id>', endpoint='force_close_day', methods=['GET', 'POST'], view_func=ForceCloseDayView.as_view('force_close_day'))
+bp.add_url_rule('/force_close_day/new', endpoint='new_force_close_day', methods=['GET', 'POST'], view_func=NewForceCloseDayView.as_view('new_force_close_day'))
+bp.add_url_rule('/force_close_query', endpoint='force_close_query', methods=['GET'], view_func=ForceCloseQueryView.as_view('force_close_query'))
 
-bp.add_url_rule('/system_settings', view_func=SystemSettingsView.as_view('system_settings'))
-bp.add_url_rule('/system_settings/rebuild_backup', view_func=RebuildBackupView.as_view('rebuild_backup'))
-bp.add_url_rule('/system_settings/manual_instance_backup', view_func=ManualInstanceBackupView.as_view('manual_instance_backup'))
+bp.add_url_rule('/system_settings', endpoint='system_settings', methods=['GET', 'POST'], view_func=SystemSettingsView.as_view('system_settings'))
+bp.add_url_rule('/system_settings/rebuild_backup', endpoint='rebuild_backup', methods=['POST'], view_func=RebuildBackupView.as_view('rebuild_backup'))
+bp.add_url_rule('/system_settings/manual_instance_backup', endpoint='manual_instance_backup', methods=['POST'], view_func=ManualInstanceBackupView.as_view('manual_instance_backup'))
