@@ -34,6 +34,20 @@ from app.services.backup_service import BackupService
 
 bp = Blueprint("cashier", __name__, url_prefix="/cashier")
 
+# ==========================================
+# Helper: Location Access Guard
+# ==========================================
+def get_authorized_location(location_slug: str):
+    """Fetch a Location by slug and verify current user has access.
+    Aborts with 404 if the slug is invalid, 403 if user lacks access.
+    Admin role bypasses the location-binding check automatically.
+    """
+    location = Location.query.filter_by(slug=location_slug).first_or_404()
+    if not current_user.can_access_location(location_slug):
+        from flask import abort
+        abort(403)
+    return location
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -151,13 +165,13 @@ class LoginView(MethodView):
             if user.has_role('Admin') or user.can('pos_operate_cashier') or user.can('report_view_daily'):
                 default_next = url_for("cashier.dashboard")
             elif user.can('access_warehouse'):
-                default_next = url_for("main.coming_soon", module_name='warehouse')
+                default_next = url_for("warehouse.dashboard")
             elif user.can('access_workshop'):
-                default_next = url_for("main.coming_soon", module_name='workshop')
+                default_next = url_for("workshop.dashboard")
             elif user.can('access_accommodation'):
-                default_next = url_for("main.coming_soon", module_name='accommodation')
+                default_next = url_for("accommodation.dashboard")
             elif user.can('access_volunteer'):
-                default_next = url_for("main.coming_soon", module_name='volunteer')
+                default_next = url_for("volunteer.dashboard")
             else:
                 default_next = url_for("main.index")
                 
@@ -286,17 +300,8 @@ class RecordTransactionView(PosAuthorizedView):
     decorators = [login_required]
     
     def post(self):
-        data = request.get_json()
-        location_slug, items = data.get("location_slug"), data.get("items", [])
-        if not items: return jsonify({"success": False, "error": "交易內容不可為空"}), 400
-
-        try:
-
-            return jsonify({"success": True, "total_sales": business_day.total_sales, "total_items": business_day.total_items, "total_transactions": business_day.total_transactions, "donation_total": d_tot, "other_total": o_tot})
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"記錄交易時發生錯誤: {e}", exc_info=True)
-            return jsonify({"success": False, "error": "伺服器內部錯誤"}), 500
+        # Placeholder: POS transaction recording not yet implemented
+        return jsonify({"success": False, "error": "此交易功能尚未實作"}), 501
 
 class CloseDayView(PosAuthorizedView):
     def get(self, location_slug):

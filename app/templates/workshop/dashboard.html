@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}工坊登記系統 - 開發中{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 text-center">
+            <div class="display-1 mb-4">🔧</div>
+            <h1 class="display-5 fw-bold text-warning mb-3">工坊登記系統</h1>
+            <p class="lead text-muted mb-4">此模組正在開發中，即將推出。</p>
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-light">
+                <h5 class="fw-bold mb-3 text-dark">預計功能</h5>
+                <ul class="list-unstyled text-start text-muted">
+                    <li class="mb-2"><i class="bi bi-check2-circle text-warning me-2"></i>貨到登記箱數</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-warning me-2"></i>開箱使用 OCR 掃描登記寄件人資訊</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-warning me-2"></i>工坊物資進出追蹤</li>
+                </ul>
+            </div>
+            <a href="{{ url_for('main.index') }}" class="btn btn-outline-warning rounded-pill px-4 text-dark">
+                <i class="bi bi-arrow-left me-2"></i>返回主頁
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
