@@ -56,7 +56,11 @@ def init_roles():
     default_roles = {
         'Admin': all_perms,
         'Manager': ['MANAGE_LOCATIONS', 'VIEW_REPORTS', 'OPERATE_POS'],
-        'Cashier': ['OPERATE_POS']
+        'Cashier': ['OPERATE_POS'],
+        'Logistic': ['ACCESS_WAREHOUSE'],
+        'Workshop': ['ACCESS_WORKSHOP'],
+        'Reception': ['ACCESS_ACCOMMODATION'],
+        'Coordinator': ['ACCESS_VOLUNTEER']
     }
     
     for r_name, r_perms in default_roles.items():
@@ -71,6 +75,39 @@ def init_roles():
             
     db.session.commit()
     click.echo("所有預設角色初始化完成。")
+
+@auth_cli.command("seed-users")
+@click.option('--password', default='123456', help="預設測試密碼")
+@with_appcontext
+def seed_users(password):
+    """建立各個子系統功能的預設測試專職帳號"""
+    demo_accounts = [
+        ('admin', 'Admin'),
+        ('cashier', 'Cashier'),
+        ('logistician', 'Logistic'),
+        ('artisan', 'Workshop'),
+        ('reception', 'Reception'),
+        ('coordinator', 'Coordinator')
+    ]
+    
+    for username, role_name in demo_accounts:
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            role = Role.query.filter_by(name=role_name).first()
+            if not role:
+                click.echo(f"警告：角色 '{role_name}' 不存在，跳過建立 '{username}'。請先執行 init-roles。")
+                continue
+                
+            new_user = User(username=username)
+            new_user.set_password(password)
+            new_user.roles.append(role)
+            db.session.add(new_user)
+            click.echo(f"已建立預設帳號：{username} (指派職務角色: {role_name})")
+        else:
+            click.echo(f"預設帳號 '{username}' 已存在，略過。")
+            
+    db.session.commit()
+    click.echo("✅ Phase 2 & 現存子系統的預設測試帳號佈署完成！")
 
 
 def init_app(app):

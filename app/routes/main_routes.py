@@ -45,6 +45,9 @@ class IndexView(MethodView):
 def check_module_permission(module_name: str) -> bool:
     if current_user.has_role('Admin'): 
         return True
+        
+    if module_name == 'system':
+        return current_user.has_role('Manager')
     
     perms_map = {
         'pos': 'operate_pos',

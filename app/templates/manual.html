@@ -42,7 +42,7 @@
 {{ page_header(
     title='系統使用手冊',
     subtitle='5 Way House 收銀系統 — 完整功能說明書',
-    button_url=url_for('main.manual_pdf'),
+    button_url=url_for('main.manual_pdf', module_name=request.view_args.get('module_name')),
     button_text='📥 下載 PDF'
 ) }}
 
@@ -63,7 +63,7 @@
             {{ manual_toc | safe }}
 
             <div class="mt-4 d-grid">
-                <a href="{{ url_for('main.manual_pdf') }}" class="btn btn-primary btn-sm">
+                <a href="{{ url_for('main.manual_pdf', module_name=request.view_args.get('module_name')) }}" class="btn btn-primary btn-sm">
                     📥 下載 PDF 版本
                 </a>
             </div>

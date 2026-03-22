@@ -673,10 +673,14 @@ flask db history
 ## 17. 常用 CLI 指令
 
 ```bash
-# 初始化角色（首次部署）
+# 初始化角色（包含四大子系統的新角色：WarehouseKeeper, Receptionist 等）
 flask auth init-roles
 
-# 建立管理員帳號
+# 自動建立全系統預設測試帳號群 (密碼皆為 123456)
+flask auth seed-users
+# (內含：admin, cashier, logistician, artisan, reception, coordinator)
+
+# 建立單一管理員帳號
 flask auth create-user <username> <password> --role Admin
 
 # 觸發即時備份

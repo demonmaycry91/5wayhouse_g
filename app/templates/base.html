@@ -79,6 +79,11 @@
                             <li><a class="dropdown-item" href="{{ url_for('main.manual', module_name='volunteer') }}">志工與活動管理手冊</a></li>
                             {% endif %}
                             
+                            {% if current_user.has_role('Admin') or current_user.has_role('Manager') %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item fw-bold text-success" href="{{ url_for('main.manual', module_name='system') }}">系統管理手冊</a></li>
+                            {% endif %}
+                            
                             {% if current_user.has_role('Admin') %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item fw-bold text-danger" href="{{ url_for('main.dev_manual') }}">開發說明書</a></li>
@@ -132,7 +137,7 @@
                     
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('auth.login') }}">登入</a>
+                        <a class="nav-link" href="{{ url_for('cashier.login') }}">登入</a>
                     </li>
                     {% endif %}
                 </ul>

@@ -41,9 +41,20 @@ def load_user(user_id):
 # ==========================================
 # Base Views (OOP Inheritance)
 # ==========================================
+from functools import wraps
+
+def operate_pos_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not (current_user.has_role('Admin') or current_user.can('operate_pos')):
+            flash("權限不足，拒絕存取實體營運模組。系統已將您引導至首頁。", "danger")
+            return redirect(url_for('main.index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 class CashierBaseView(MethodView):
-    """Base class for standard cashier views, requires login"""
-    decorators = [login_required]
+    """Base class for standard cashier views, requires login and POS access"""
+    decorators = [login_required, operate_pos_required]
 
 class AdminBaseView(MethodView):
     """Base class for admin views, requires login and admin privileges"""
@@ -52,9 +63,9 @@ class AdminBaseView(MethodView):
 # ==========================================
 # Authentication & Core Dashboard
 # ==========================================
-class IndexView(CashierBaseView):
+class IndexView(MethodView):
     def get(self):
-        return redirect(url_for('cashier.dashboard'))
+        return redirect(url_for('main.index'))
 
 class DashboardView(CashierBaseView):
     def get(self):
@@ -117,10 +128,27 @@ class LoginView(MethodView):
                 host_parsed = urlparse(request.host_url)
                 if parsed.netloc != host_parsed.netloc:
                     next_page = None 
-            return redirect(next_page or url_for("cashier.dashboard"))
+            
+            # Smart PBX Dispatcher
+            if user.has_role('Admin') or user.can('operate_pos'):
+                default_next = url_for("cashier.dashboard")
+            elif user.can('access_warehouse'):
+                default_next = url_for("main.coming_soon", module_name='warehouse')
+            elif user.can('access_workshop'):
+                default_next = url_for("main.coming_soon", module_name='workshop')
+            elif user.can('access_accommodation'):
+                default_next = url_for("main.coming_soon", module_name='accommodation')
+            elif user.can('access_volunteer'):
+                default_next = url_for("main.coming_soon", module_name='volunteer')
+            else:
+                default_next = url_for("main.index")
+                
+            return redirect(next_page or default_next)
         return render_template("cashier/login.html", form=form)
 
-class LogoutView(CashierBaseView):
+class LogoutView(MethodView):
+    decorators = [login_required]
+    
     def get(self):
         current_app.logger.info("LOGOUT | user_id=%s | username=%s | ip=%s", current_user.id, current_user.username, request.remote_addr)
         logout_user()
@@ -426,8 +454,6 @@ bp.add_url_rule('/dashboard', view_func=DashboardView.as_view('dashboard'))
 bp.add_url_rule('/login', view_func=LoginView.as_view('login'))
 bp.add_url_rule('/logout', view_func=LogoutView.as_view('logout'))
 bp.add_url_rule('/settings', view_func=SettingsView.as_view('settings'))
-bp.add_url_rule('/rebuild_backup', view_func=RebuildBackupView.as_view('rebuild_backup'))
-bp.add_url_rule('/manual_instance_backup', view_func=ManualInstanceBackupView.as_view('manual_instance_backup'))
 bp.add_url_rule('/start_day/<location_slug>', view_func=StartDayView.as_view('start_day'))
 bp.add_url_rule('/reopen_day/<location_slug>', view_func=ReopenDayView.as_view('reopen_day'))
 bp.add_url_rule('/pos/<location_slug>', view_func=POSView.as_view('pos'))

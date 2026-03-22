@@ -67,7 +67,8 @@ class User(db.Model, UserMixin):
 
     def can(self, permission_name):
         for role in self.roles:
-            if permission_name in role.get_permissions():
+            perms = [p.lower().strip() for p in role.get_permissions()]
+            if permission_name.lower().strip() in perms:
                 return True
         return False
 
