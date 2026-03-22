@@ -96,7 +96,17 @@ class ManualPDFView(LoginRequiredView):
 
 class ComingSoonView(LoginRequiredView):
     def get(self, module_name):
-        """開發中功能預留頁面 (受特例憑證管制)"""
+        """Redirect known modules to their dedicated dashboard; others show coming soon."""
+        # Redirect to dedicated module dashboards if they exist
+        module_dashboard_map = {
+            'warehouse': 'warehouse.dashboard',
+            'workshop': 'workshop.dashboard',
+            'accommodation': 'accommodation.dashboard',
+            'volunteer': 'volunteer.dashboard',
+        }
+        if module_name in module_dashboard_map:
+            return redirect(url_for(module_dashboard_map[module_name]))
+        
         if not check_module_permission(module_name):
             abort(403)
         return render_template('coming_soon.html')

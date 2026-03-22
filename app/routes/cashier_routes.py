@@ -3,7 +3,7 @@ import os
 import json
 from flask import (
     render_template, request, flash, redirect,
-    url_for, Blueprint, jsonify, current_app, Response, make_response
+    url_for, Blueprint, jsonify, current_app, Response, make_response, abort
 )
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import date
@@ -129,6 +129,9 @@ class DashboardView(MethodView):
                 status_info = {"business_day_id": business_day.id, "status_text": "待確認報表", "message": "點擊以檢視並確認本日報表。", "badge_class": "bg-warning text-dark", "url": url_for("cashier.daily_report", location_slug=location.slug)}
             elif business_day.status == "CLOSED":
                 status_info = {"business_day_id": business_day.id, "status_text": "已日結", "message": "本日帳務已結算，僅供查閱。", "badge_class": "bg-primary", "url": url_for("cashier.daily_report", location_slug=location.slug)}
+            else:
+                # Fallback for unexpected status values - prevents NameError / 500
+                status_info = {"business_day_id": business_day.id, "status_text": "狀態異常", "message": "該據點狀態異常，請聯繫管理員。", "badge_class": "bg-secondary", "url": url_for("cashier.dashboard")}
             locations_status[location] = status_info
         return render_template("cashier/dashboard.html", today_date=today.strftime("%Y-%m-%d"), locations_status=locations_status)
 
@@ -137,6 +140,12 @@ class LoginView(MethodView):
     
     def get(self):
         if current_user.is_authenticated:
+            next_page = request.args.get('next')
+            if next_page:
+                from urllib.parse import urlparse, urljoin
+                parsed = urlparse(urljoin(request.host_url, next_page))
+                if urlparse(request.host_url).netloc == parsed.netloc:
+                    return redirect(next_page)
             return redirect(url_for("cashier.dashboard"))
         return render_template("cashier/login.html", form=LoginForm())
 

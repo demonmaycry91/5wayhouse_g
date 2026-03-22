@@ -100,10 +100,10 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownOps">
                             <li><a class="dropdown-item fw-bold text-primary" href="{{ url_for('cashier.dashboard') }}">實體據點營運</a></li>
                             <li><h6 class="dropdown-header text-secondary fw-bold mt-2">下一階段開發計畫</h6></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon', module_name='warehouse') }}">倉庫物流管理</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon', module_name='workshop') }}">工坊登記系統</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon', module_name='accommodation') }}">住宿登錄系統</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.coming_soon', module_name='volunteer') }}">志工與活動管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('warehouse.dashboard') }}">倉庫物流管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('workshop.dashboard') }}">工坊登記系統</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('accommodation.dashboard') }}">住宿登錄系統</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('volunteer.dashboard') }}">志工與活動管理</a></li>
                         </ul>
                     </li>
                     {% endif %}
@@ -139,7 +139,7 @@
                 {% else %}
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link text-white fw-bold btn btn-primary px-4 rounded-pill shadow-sm" href="{{ url_for('cashier.login') }}">登入入口</a>
+                        <a class="nav-link text-white fw-bold btn btn-primary px-4 rounded-pill shadow-sm" href="{{ url_for('cashier.login', next=request.path) }}">登入入口</a>
                     </li>
                 </ul>
                 {% endif %}
