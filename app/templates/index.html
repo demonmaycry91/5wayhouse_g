@@ -14,81 +14,56 @@
     <div class="row g-4 mb-5">
         
         <!-- POS Module -->
-        {% set can_pos = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('pos_operate_cashier')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 {{ 'hover-lift' if can_pos else 'disabled-module' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 hover-lift">
                 <div class="card-body p-4 d-flex flex-column">
                     <h4 class="card-title fw-bold mb-3 text-dark">實體據點營運</h4>
                     <p class="card-text text-muted small mb-4 card-text-fixed-height">包含各據點的 POS 收銀終端、每日交班日報表、業績報表彙算與進階系統設定。</p>
-                    {% if can_pos %}
                     <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-outline-primary stretched-link w-100 rounded-pill mt-auto">進入營業系統</a>
-                    {% else %}
-                    <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
-                    {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Warehouse Module -->
-        {% set can_warehouse = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_warehouse')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-success border-4 rounded-4 {{ 'hover-lift' if can_warehouse else 'disabled-module' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-success border-4 rounded-4 hover-lift">
                 <div class="card-body p-4 d-flex flex-column">
                     <h4 class="card-title fw-bold mb-3 text-dark">倉庫物流管理</h4>
                     <p class="card-text text-muted small mb-4 card-text-fixed-height">貨物分類後進入倉庫的登記、出貨到店鋪的登記</p>
-                    {% if can_warehouse %}
                     <a href="{{ url_for('warehouse.dashboard') }}" class="btn btn-outline-success stretched-link w-100 rounded-pill mt-auto">進入系統</a>
-                    {% else %}
-                    <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
-                    {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Workshop Module -->
-        {% set can_workshop = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_workshop')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-warning border-4 rounded-4 {{ 'hover-lift' if can_workshop else 'disabled-module' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-warning border-4 rounded-4 hover-lift">
                 <div class="card-body p-4 d-flex flex-column">
                     <h4 class="card-title fw-bold mb-3 text-dark">工坊登記系統</h4>
                     <p class="card-text text-muted small mb-4 card-text-fixed-height">貨到登記箱數、開箱使用 OCR 掃描並登記寄件人資訊</p>
-                    {% if can_workshop %}
                     <a href="{{ url_for('workshop.dashboard') }}" class="btn btn-outline-warning text-dark border-warning stretched-link w-100 rounded-pill mt-auto">進入系統</a>
-                    {% else %}
-                    <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
-                    {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Accommodation Module -->
-        {% set can_accommodation = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_accommodation')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-info border-4 rounded-4 {{ 'hover-lift' if can_accommodation else 'disabled-module' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-info border-4 rounded-4 hover-lift">
                 <div class="card-body p-4 d-flex flex-column">
                     <h4 class="card-title fw-bold mb-3 text-dark">住宿登錄系統</h4>
                     <p class="card-text text-muted small mb-4 card-text-fixed-height">設定多個住宿地點、房間數量類型與容納人數、登記時段</p>
-                    {% if can_accommodation %}
                     <a href="{{ url_for('accommodation.dashboard') }}" class="btn btn-outline-info text-dark border-info stretched-link w-100 rounded-pill mt-auto">進入系統</a>
-                    {% else %}
-                    <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
-                    {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Volunteer Module -->
-        {% set can_volunteer = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_volunteer')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4 rounded-4 {{ 'hover-lift' if can_volunteer else 'disabled-module' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4 rounded-4 hover-lift">
                 <div class="card-body p-4 d-flex flex-column">
                     <h4 class="card-title fw-bold mb-3 text-dark">志工與活動管理</h4>
                     <p class="card-text text-muted small mb-4 card-text-fixed-height">開設活動並登錄志工信息、生成可自訂模板的感謝狀 / 證明狀</p>
-                    {% if can_volunteer %}
                     <a href="{{ url_for('volunteer.dashboard') }}" class="btn btn-outline-danger stretched-link w-100 rounded-pill mt-auto">進入系統</a>
-                    {% else %}
-                    <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
-                    {% endif %}
                 </div>
             </div>
         </div>

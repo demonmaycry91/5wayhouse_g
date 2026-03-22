@@ -44,7 +44,6 @@ def get_authorized_location(location_slug: str):
     """
     location = Location.query.filter_by(slug=location_slug).first_or_404()
     if not current_user.can_access_location(location_slug):
-        from flask import abort
         abort(403)
     return location
 
@@ -136,65 +135,18 @@ class DashboardView(MethodView):
         return render_template("cashier/dashboard.html", today_date=today.strftime("%Y-%m-%d"), locations_status=locations_status)
 
 class LoginView(MethodView):
-    decorators = [limiter.limit("10 per minute", error_message="登入嘗試次數過多，請稍候再試。")]
-    
-    def get(self):
-        if current_user.is_authenticated:
-            next_page = request.args.get('next')
-            if next_page:
-                from urllib.parse import urlparse, urljoin
-                parsed = urlparse(urljoin(request.host_url, next_page))
-                if urlparse(request.host_url).netloc == parsed.netloc:
-                    return redirect(next_page)
-            return redirect(url_for("cashier.dashboard"))
-        return render_template("cashier/login.html", form=LoginForm())
-
-    def post(self):
-        if current_user.is_authenticated:
-            return redirect(url_for("cashier.dashboard"))
-        form = LoginForm()
-        if form.validate_on_submit():
-            user = User.query.filter_by(username=form.username.data).first()
-            if user is None or not user.check_password(form.password.data):
-                current_app.logger.warning("LOGIN_FAILED | username=%s | ip=%s", form.username.data, request.remote_addr)
-                flash("帳號或密碼錯誤，請重新輸入。", "danger")
-                return redirect(url_for("cashier.login"))
-            
-            current_app.logger.info("LOGIN_SUCCESS | user_id=%s | username=%s | ip=%s", user.id, user.username, request.remote_addr)
-            login_user(user)
-            
-            next_page = request.args.get("next")
-            if next_page:
-                parsed = urlparse(urljoin(request.host_url, next_page))
-                host_parsed = urlparse(request.host_url)
-                if parsed.netloc != host_parsed.netloc:
-                    next_page = None 
-            
-            # Smart PBX Dispatcher
-            if user.has_role('Admin') or user.can('pos_operate_cashier') or user.can('report_view_daily'):
-                default_next = url_for("cashier.dashboard")
-            elif user.can('access_warehouse'):
-                default_next = url_for("warehouse.dashboard")
-            elif user.can('access_workshop'):
-                default_next = url_for("workshop.dashboard")
-            elif user.can('access_accommodation'):
-                default_next = url_for("accommodation.dashboard")
-            elif user.can('access_volunteer'):
-                default_next = url_for("volunteer.dashboard")
-            else:
-                default_next = url_for("main.index")
-                
-            return redirect(next_page or default_next)
-        return render_template("cashier/login.html", form=form)
+    """Legacy redirect: /cashier/login -> /login (backward compatibility)"""
+    def get(self):  return redirect(url_for('auth.login', next=request.args.get('next', '')))
+    def post(self): return redirect(url_for('auth.login', next=request.args.get('next', '')))
 
 class LogoutView(MethodView):
+    """Legacy redirect: /cashier/logout -> /logout"""
     decorators = [login_required]
-    
     def get(self):
         current_app.logger.info("LOGOUT | user_id=%s | username=%s | ip=%s", current_user.id, current_user.username, request.remote_addr)
         logout_user()
         flash("您已成功登出。", "info")
-        return redirect(url_for("cashier.login"))
+        return redirect(url_for('auth.login'))
 
 # ==========================================
 # Settings & Backups
@@ -309,8 +261,110 @@ class RecordTransactionView(PosAuthorizedView):
     decorators = [login_required]
     
     def post(self):
-        # Placeholder: POS transaction recording not yet implemented
-        return jsonify({"success": False, "error": "此交易功能尚未實作"}), 501
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"success": False, "error": "無效的請求格式"}), 400
+
+        location_slug = data.get("location_slug", "").strip()
+        items_data = data.get("items", [])
+        cash_received = data.get("cash_received", 0)
+        change_given = data.get("change_given", 0)
+
+        if not location_slug:
+            return jsonify({"success": False, "error": "缺少據點資訊"}), 400
+        if not items_data:
+            return jsonify({"success": False, "error": "交易內容不可為空"}), 400
+
+        location = Location.query.filter_by(slug=location_slug).first()
+        if not location:
+            return jsonify({"success": False, "error": f"找不到據點: {location_slug}"}), 404
+
+        if not current_user.can_access_location(location_slug):
+            return jsonify({"success": False, "error": "您無權操作此據點"}), 403
+
+        business_day = BusinessDay.query.filter_by(
+            date=date.today(), location_id=location.id, status="OPEN"
+        ).first()
+        if not business_day:
+            return jsonify({"success": False, "error": "今日尚無開啟中的業務日，請先開帳"}), 409
+
+        try:
+            # Separate product/discount items from other_income items
+            # The JS sends each item with price + category_id
+            product_items = [i for i in items_data if i.get("price", 0) > 0]
+            discount_items = [i for i in items_data if i.get("price", 0) < 0]
+            
+            total_amount = sum(i.get("price", 0) for i in items_data)
+            total_positive = sum(i.get("price", 0) for i in product_items)
+            item_count = len([i for i in items_data if i.get("price", 0) > 0])
+            
+            discount_json = ",".join([str(abs(i.get("price", 0))) for i in discount_items]) if discount_items else None
+
+            txn = Transaction(
+                amount=total_amount,
+                item_count=item_count,
+                business_day_id=business_day.id,
+                cash_received=float(cash_received),
+                change_given=float(change_given),
+                discounts=discount_json
+            )
+            db.session.add(txn)
+            db.session.flush()  # Get txn.id without committing
+
+            for item in items_data:
+                cat_id = item.get("category_id")
+                price = float(item.get("price", 0))
+                if cat_id is None:
+                    # No category (manual input) — skip creating TransactionItem
+                    continue
+                ti = TransactionItem(
+                    price=price,
+                    transaction_id=txn.id,
+                    category_id=int(cat_id)
+                )
+                db.session.add(ti)
+
+            # Update BusinessDay aggregates
+            business_day.total_sales = (business_day.total_sales or 0) + max(total_amount, 0)
+            business_day.total_items = (business_day.total_items or 0) + item_count
+            business_day.total_transactions = (business_day.total_transactions or 0) + 1
+
+            db.session.commit()
+
+            # Recalculate other income totals to return to frontend
+            from sqlalchemy import func as sql_func
+            other_income_totals = db.session.query(Category.name, sql_func.sum(TransactionItem.price)) \
+                .join(TransactionItem.transaction).join(Transaction.business_day).join(TransactionItem.category) \
+                .filter(BusinessDay.id == business_day.id, Category.category_type == 'other_income') \
+                .group_by(Category.name).all()
+
+            donation_total = 0
+            other_total = 0
+            for name, total in other_income_totals:
+                v = total or 0
+                if name == '捐款':
+                    donation_total = v
+                else:
+                    other_total += v
+
+            current_app.logger.info(
+                "TRANSACTION | business_day=%s | location=%s | amount=%.2f | user=%s",
+                business_day.id, location_slug, total_amount, current_user.username
+            )
+
+            return jsonify({
+                "success": True,
+                "total_sales": business_day.total_sales,
+                "total_items": business_day.total_items,
+                "total_transactions": business_day.total_transactions,
+                "donation_total": donation_total,
+                "other_total": other_total
+            })
+
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error("TRANSACTION_ERROR | %s | user=%s", str(e), current_user.username, exc_info=True)
+            return jsonify({"success": False, "error": "伺服器內部錯誤，交易未記錄"}), 500
 
 class CloseDayView(PosAuthorizedView):
     def get(self, location_slug):

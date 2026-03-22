@@ -385,7 +385,7 @@ class POSController {
     async _sendTrans(items, paidAmount, chgRec) {
         const exp = []; items.forEach(it => { for (let i = 0; i < it.quantity; i++) exp.push({ price: it.unitPrice, category_id: it.category_id }); });
         try {
-            const resp = await fetch("/cashier/record_transaction", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": window.CSRF_TOKEN }, body: JSON.stringify({ location_slug: typeof POS_LOCATION_SLUG !== 'undefined' ? POS_LOCATION_SLUG : '', items: exp, cash_received: paidAmount, change_given: chgRec }) });
+            const resp = await fetch(window.POS_API_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": window.CSRF_TOKEN }, body: JSON.stringify({ location_slug: window.LOCATION_SLUG || '', items: exp, cash_received: paidAmount, change_given: chgRec }) });
             if (!resp.ok) throw new Error("Network response was not ok");
             const res = await resp.json();
             if (res.success) { this.ui.updateDashboardTotals(res.total_sales, res.total_transactions, res.total_items, res.donation_total, res.other_total); return true; }

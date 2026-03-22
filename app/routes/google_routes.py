@@ -54,14 +54,14 @@ class CallbackView(GoogleAuthBaseView):
             flow.fetch_token(authorization_response=request.url)
         except Exception as e:
             flash(f'無法從 Google 獲取 Token: {e}', 'danger')
-            return redirect(url_for('cashier.login'))
+            return redirect(url_for('auth.login'))
 
         credentials = flow.credentials
         userinfo_response = requests.get('https://www.googleapis.com/oauth2/v1/userinfo', headers={'Authorization': f'Bearer {credentials.token}'})
         
         if not userinfo_response.ok:
             flash('無法從 Google 獲取使用者資訊。', 'danger')
-            return redirect(url_for('cashier.login'))
+            return redirect(url_for('auth.login'))
             
         user_info = userinfo_response.json()
         google_id = user_info['id']

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}需要登入 - 5 Way House{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0 border-top border-secondary border-4 rounded-4 my-5 mx-auto" style="max-width: 500px;">
+    <div class="card-body p-5 text-center">
+        <div class="mb-4 text-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" class="bi bi-shield-lock" viewBox="0 0 16 16">
+                <path d="M5.338 1.59a59.768 59.768 0 0 0-2.834.856 1.527 1.527 0 0 0-1.037 1.564c.188 3.083 1.954 7.224 5.28 8.97a1.52 1.52 0 0 0 1.506 0c3.326-1.746 5.092-5.887 5.28-8.97a1.527 1.527 0 0 0-1.037-1.564 59.765 59.765 0 0 0-2.834-.856A1.52 1.52 0 0 0 8 1.071c-.347 0-.69.17-1.002.519L5.338 1.59zM8 12.31c-2.873-1.442-4.524-4.881-4.664-7.51a1.5 1.5 0 0 1 1.01-1.53c.995-.333 2.1-.643 3.197-.887a.5.5 0 0 1 .457 0c1.097.244 2.202.554 3.197.887a1.5 1.5 0 0 1 1.01 1.53c-.14 2.629-1.791 6.068-4.664 7.51z"/>
+                <path d="M9.5 6.5a1.5 1.5 0 0 1-1 1.415l.385 1.99a.5.5 0 0 1-.491.595h-.788a.5.5 0 0 1-.49-.595l.384-1.99a1.5 1.5 0 1 1 2-1.415z"/>
+            </svg>
+        </div>
+        <h3 class="fw-bold mb-3">請先登入</h3>
+        <p class="text-muted mb-4">您需要登入系統才能使用此功能模組。</p>
+        <a href="{{ url_for('auth.login', next=request.path) }}" class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm">前去登入</a>
+    </div>
+</div>
+{% endblock %}

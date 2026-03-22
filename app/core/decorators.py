@@ -13,3 +13,21 @@ def admin_required(f):
             abort(403)  # Forbidden
         return f(*args, **kwargs)
     return decorated_function
+
+def require_module_permission(permission_name):
+    """
+    Ensure the user has the required permission for a module.
+    If not authenticated, it renders a login prompt inline instead of a hard redirect.
+    If authenticated but lacking permission, it aborts with 403.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            from flask import request, render_template
+            if not current_user.is_authenticated:
+                return render_template('partials/login_required.html', next=request.path)
+            if not (current_user.has_role('Admin') or current_user.can(permission_name)):
+                abort(403)
+            return f(*args, **kwargs)
+        return decorated
+    return decorator

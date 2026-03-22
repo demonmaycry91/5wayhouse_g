@@ -1,24 +1,27 @@
 {% extends "base.html" %}
-{% block title %}倉庫物流管理 - 開發中{% endblock %}
+{% from "macros.html" import page_header with context %}
+{% block title %}庫存管理系統 - 開發中{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+{{ page_header(
+    title='庫存管理系統',
+    subtitle='此模組正在開發中，即將推出。',
+    button_url=url_for('main.index'),
+    button_text='返回主頁',
+    icon='bi-box-seam'
+) }}
+
+<div class="container py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-7 text-center">
-            <div class="display-1 mb-4">🏭</div>
-            <h1 class="display-5 fw-bold text-success mb-3">倉庫物流管理</h1>
-            <p class="lead text-muted mb-4">此模組正在開發中，即將推出。</p>
-            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-light">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-light">
                 <h5 class="fw-bold mb-3 text-dark">預計功能</h5>
                 <ul class="list-unstyled text-start text-muted">
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>貨物分類後進入倉庫的登記</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>出貨到店鋪的物流登記</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>庫存即時追蹤與查詢</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>即時庫存數量查詢與變動紀錄</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>自動盤點報表生成</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>低水位警示通知</li>
                 </ul>
             </div>
-            <a href="{{ url_for('main.index') }}" class="btn btn-outline-success rounded-pill px-4">
-                <i class="bi bi-arrow-left me-2"></i>返回主頁
-            </a>
         </div>
     </div>
 </div>

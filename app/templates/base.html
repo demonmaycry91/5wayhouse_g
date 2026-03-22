@@ -133,13 +133,13 @@
                     
                     
                     <li class="nav-item">
-                        <a class="nav-link text-white fw-bold opacity-75 hover-opacity-100" href="{{ url_for('cashier.logout') }}">登出 ({{ current_user.username }})</a>
+                        <a class="nav-link text-white fw-bold opacity-75 hover-opacity-100" href="{{ url_for('auth.logout') }}">登出 ({{ current_user.username }})</a>
                     </li>
                 </ul>
                 {% else %}
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link text-white fw-bold btn btn-primary px-4 rounded-pill shadow-sm" href="{{ url_for('cashier.login', next=request.path) }}">登入入口</a>
+                        <a class="nav-link text-white fw-bold btn btn-primary px-4 rounded-pill shadow-sm" href="{{ url_for('auth.login', next=request.path) }}">登入入口</a>
                     </li>
                 </ul>
                 {% endif %}

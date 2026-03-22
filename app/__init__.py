@@ -54,6 +54,10 @@ def create_app(config_name=None):
     # 載入設定檔
     app.config.from_object(app_config[config_name]())
     
+    # 強制安全 Cookie 設定
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    
     app.redis = Redis.from_url(app.config['REDIS_URL'])
     app.task_queue = rq.Queue('cashier-tasks', connection=app.redis)
 
@@ -72,10 +76,13 @@ def create_app(config_name=None):
         return {}
     app.jinja_env.filters['from_json'] = from_json_filter
 
-    from .routes import main_routes, ocr_routes, cashier_routes, google_routes, admin_routes, report_routes
-    from .routes import warehouse_routes, workshop_routes, accommodation_routes, volunteer_routes
+    from app.routes import main_routes, auth_routes, cashier_routes, report_routes, admin_routes, \
+                           google_routes, ocr_routes, warehouse_routes, \
+                           workshop_routes, accommodation_routes, volunteer_routes
     app.register_blueprint(main_routes.bp)
+    app.register_blueprint(auth_routes.bp)
     app.register_blueprint(ocr_routes.bp)
+    app.register_blueprint(cashier_routes.bp)
     app.register_blueprint(cashier_routes.bp)
     app.register_blueprint(google_routes.bp)
     app.register_blueprint(admin_routes.bp)
@@ -107,6 +114,8 @@ def create_app(config_name=None):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         # 控制 Referer 標頭洩露
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        # 強制使用 HTTPS (HSTS)
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         # 限制瀏覽器功能（攝影機、麥克風等）
         response.headers['Permissions-Policy'] = (
             'geolocation=(), microphone=(), camera=()'

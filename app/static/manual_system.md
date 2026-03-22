@@ -122,4 +122,10 @@ docker compose restart web
 ```
 
 ### 5.4 Google API 憑證掛載
-向 GCP 申請憑證 JSON 檔，重新命名為 `client_secret.json`，放置於伺服器 `instance/` 目錄內即可生效。
+為啟用 Google 雲端備份與 Google 登入功能，必須建立 GCP 專案並配置憑證：
+1. 向 GCP 申請 Web App OAuth 2.0 用戶端 ID 憑證 JSON 檔，下載並重新命名為 `client_secret.json`。
+2. 將檔案透過 FTP/SCP 放置於伺服器部署根目錄內的 `instance/` 目錄內。
+3. 若伺服器沒有對外開放網域來承接 Google 的 Callback URL，您需要：
+   - 先在**本地開發機**的 `config.py` 環境中放入 `client_secret.json` 並執行一次系統的 Google 登入認證，這將自動產生 `token.json`。
+   - 將產生的 `token.json` 一併手動上傳至伺服器 `instance/` 目錄。
+   - 伺服器後續透過這份 token 即可進行背景操作而無需再次開啟網頁授權。

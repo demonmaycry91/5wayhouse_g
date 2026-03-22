@@ -281,7 +281,8 @@ SystemSetting（獨立鍵值表）
 | Blueprint | URL Prefix | 功能 |
 |-----------|-----------|------|
 | `main` | `/` | 首頁、說明書 |
-| `cashier` | `/cashier` | 開帳、POS、結帳、Dashboard |
+| `auth` | `/` | 統一登入 (`/login`)、登出 (`/logout`) |
+| `cashier` | `/cashier` | 開帳、POS、結帳、模組儀表板 |
 | `admin` | `/admin` | 管理後台（@admin_required）|
 | `report` | `/report` | 報表查詢、合併結算 |
 | `ocr` | `/ocr` | 收據上傳與 OCR 驗證 |
@@ -289,8 +290,9 @@ SystemSetting（獨立鍵值表）
 
 ### 主要路由清單
 
-```
 GET  /                              → 首頁
+GET  /login                         → 統一登入頁面
+GET  /logout                        → 統一登出機制
 GET  /manual                        → 使用者手冊
 GET  /manual/pdf                    → 使用者手冊 PDF
 GET  /dev                           → 開發說明書
@@ -629,6 +631,10 @@ docker-compose --env-file .env up -d --build
 預設帳號密碼為：
 - 帳號：`admin`
 - 密碼：`password`
+
+**步驟五、手動配置 Google OAuth API 憑證（若需使用備份與 SSO 功能）**
+1. 向 GCP 申請憑證 JSON 檔，重新命名為 `client_secret.json`，放置於伺服器 `instance/` 目錄內。
+2. 以 Admin 身分登入系統，前往「系統後台管理 > 全域系統設定」點擊連結 Google 帳號，以產生 `token.json`。若無法從外部完成 OAuth 回呼，需在本地開發機取得 `token.json` 後手動上傳至伺服器 `instance/` 目錄。
 
 
 ### 15.2 常用維運指令

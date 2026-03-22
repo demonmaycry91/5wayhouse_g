@@ -28,5 +28,8 @@ limiter = Limiter(
 )
 
 # 由於登入視圖會搬到 auth module，這裡可能需要延後設定或稍後再更新
-login_manager.login_view = 'cashier.login'
+login_manager.login_view = 'auth.login'
+login_manager.login_message = '請先登入以存取此頁面。'
+login_manager.login_message_category = 'warning'
+
 

@@ -2,9 +2,11 @@
 {% block title %}請求過於頻繁 (429){% endblock %}
 {% block content %}
 <div class="container py-5 text-center">
-    <div class="display-1 fw-bold text-danger mb-3">429</div>
-    <h2 class="mb-3">請求次數過多</h2>
-    <p class="text-muted mb-4">您的操作過於頻繁，請稍候片刻後再試。</p>
-    <a href="{{ url_for('cashier.login') }}" class="btn btn-primary">← 返回登入頁</a>
+    <h1 class="display-3 fw-bold text-danger">429</h1>
+    <h2 class="mb-4">請求次數過多</h2>
+    <p class="lead text-muted mb-4">
+        您的操作過於頻繁，已觸發系統的安全限制。請稍候幾分鐘後再嘗試操作。
+    </p>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">← 返回登入頁</a>
 </div>
 {% endblock %}
