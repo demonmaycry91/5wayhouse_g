@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, Response, current_app
 from flask.views import MethodView
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func, case, extract, and_

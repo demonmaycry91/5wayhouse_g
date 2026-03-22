@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "macros.html" import page_header with context %}
-{% block title %}手作報名與點名統 - 開發中{% endblock %}
+{% block title %}工坊登記系統 - 開發中{% endblock %}
 
 {% block content %}
 {{ page_header(
-    title='手作報名與點名統',
+    title='工坊登記系統',
     subtitle='此模組正在開發中，即將推出。',
     button_url=url_for('main.index'),
     button_text='返回主頁',
-    icon='bi-hammer'
+    icon='bi-box-seam'
 ) }}
 
 <div class="container py-4">
@@ -17,9 +17,9 @@
             <div class="card border-0 shadow-sm rounded-4 p-4 bg-light">
                 <h5 class="fw-bold mb-3 text-dark">預計功能</h5>
                 <ul class="list-unstyled text-start text-muted">
-                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>活動課程發佈與線上報名</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>報名名單管理與繳費狀態確認</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>現場掃碼或手動點名報到</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>收寄物流與貨物箱數登記</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>開箱掃描寄件人 OCR 錄入</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-info me-2"></i>工坊進位與庫存流轉管理</li>
                 </ul>
             </div>
         </div>
