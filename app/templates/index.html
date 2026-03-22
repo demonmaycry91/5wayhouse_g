@@ -11,13 +11,12 @@
     </div>
 
     <!-- Flattened Module Integration -->
-    <h3 class="fw-bold mb-4 border-bottom pb-2">營運與開發模組</h3>
     <div class="row g-4 mb-5">
         
         <!-- POS Module -->
-        {% set can_pos = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('operate_pos')) %}
+        {% set can_pos = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('pos_operate_cashier')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 {{ 'opacity-50' if not can_pos else 'hover-lift' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 {{ 'hover-lift' if can_pos else 'disabled-module' }}">
                 <div class="card-body p-4">
                     <h4 class="card-title fw-bold mb-3 text-dark">實體據點營運</h4>
                     <p class="card-text text-muted mb-4">包含各據點的 POS 收銀終端、每日交班日報表、業績報表彙算與進階系統設定。</p>
@@ -33,12 +32,12 @@
         <!-- Warehouse Module -->
         {% set can_warehouse = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_warehouse')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-4 rounded-4 {{ 'opacity-50' if not can_warehouse else 'hover-lift' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-success border-4 rounded-4 {{ 'hover-lift' if can_warehouse else 'disabled-module' }}">
                 <div class="card-body p-4">
                     <h4 class="card-title fw-bold mb-3 text-dark">倉庫物流管理</h4>
                     <p class="text-muted small">貨物分類後進入倉庫的登記、出貨到店鋪的登記</p>
                     {% if can_warehouse %}
-                    <a href="{{ url_for('main.coming_soon', module_name='warehouse') }}" class="btn btn-outline-secondary stretched-link w-100 rounded-pill mt-auto">開發中</a>
+                    <a href="{{ url_for('main.coming_soon', module_name='warehouse') }}" class="btn btn-outline-success stretched-link w-100 rounded-pill mt-auto">進入系統</a>
                     {% else %}
                     <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
                     {% endif %}
@@ -49,12 +48,12 @@
         <!-- Workshop Module -->
         {% set can_workshop = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_workshop')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-4 rounded-4 {{ 'opacity-50' if not can_workshop else 'hover-lift' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-warning border-4 rounded-4 {{ 'hover-lift' if can_workshop else 'disabled-module' }}">
                 <div class="card-body p-4">
                     <h4 class="card-title fw-bold mb-3 text-dark">工坊登記系統</h4>
                     <p class="text-muted small">貨到登記箱數、開箱使用 OCR 掃描並登記寄件人資訊</p>
                     {% if can_workshop %}
-                    <a href="{{ url_for('main.coming_soon', module_name='workshop') }}" class="btn btn-outline-secondary stretched-link w-100 rounded-pill mt-auto">開發中</a>
+                    <a href="{{ url_for('main.coming_soon', module_name='workshop') }}" class="btn btn-outline-warning text-dark border-warning stretched-link w-100 rounded-pill mt-auto">進入系統</a>
                     {% else %}
                     <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
                     {% endif %}
@@ -65,12 +64,12 @@
         <!-- Accommodation Module -->
         {% set can_accommodation = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_accommodation')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-4 rounded-4 {{ 'opacity-50' if not can_accommodation else 'hover-lift' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-info border-4 rounded-4 {{ 'hover-lift' if can_accommodation else 'disabled-module' }}">
                 <div class="card-body p-4">
                     <h4 class="card-title fw-bold mb-3 text-dark">住宿登錄系統</h4>
                     <p class="text-muted small">設定多個住宿地點、房間數量類型與容納人數、登記時段</p>
                     {% if can_accommodation %}
-                    <a href="{{ url_for('main.coming_soon', module_name='accommodation') }}" class="btn btn-outline-secondary stretched-link w-100 rounded-pill mt-auto">開發中</a>
+                    <a href="{{ url_for('main.coming_soon', module_name='accommodation') }}" class="btn btn-outline-info text-dark border-info stretched-link w-100 rounded-pill mt-auto">進入系統</a>
                     {% else %}
                     <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
                     {% endif %}
@@ -81,12 +80,12 @@
         <!-- Volunteer Module -->
         {% set can_volunteer = current_user.is_authenticated and (current_user.has_role('Admin') or current_user.can('access_volunteer')) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-secondary border-4 rounded-4 {{ 'opacity-50' if not can_volunteer else 'hover-lift' }}">
+            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4 rounded-4 {{ 'hover-lift' if can_volunteer else 'disabled-module' }}">
                 <div class="card-body p-4">
                     <h4 class="card-title fw-bold mb-3 text-dark">志工與活動管理</h4>
                     <p class="text-muted small">開設活動並登錄志工信息、生成可自訂模板的感謝狀 / 證明狀</p>
                     {% if can_volunteer %}
-                    <a href="{{ url_for('main.coming_soon', module_name='volunteer') }}" class="btn btn-outline-secondary stretched-link w-100 rounded-pill mt-auto">開發中</a>
+                    <a href="{{ url_for('main.coming_soon', module_name='volunteer') }}" class="btn btn-outline-danger stretched-link w-100 rounded-pill mt-auto">進入系統</a>
                     {% else %}
                     <button class="btn btn-secondary w-100 rounded-pill disabled mt-auto" style="pointer-events: none;">權限不足 / 請登入</button>
                     {% endif %}
@@ -104,6 +103,10 @@
 .hover-lift:hover {
     transform: translateY(-5px);
     box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+.disabled-module {
+    filter: grayscale(100%);
+    opacity: 0.6;
 }
 </style>
 {% endblock %}
