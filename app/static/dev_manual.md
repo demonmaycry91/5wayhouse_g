@@ -688,3 +688,46 @@ flask routes
 # 語法編譯檢查
 python3 -m compileall app/
 ```
+
+---
+
+## 18. Phase 2 開發指引與架構預留 (Scaffolding Guideline)
+目前四大未來的子系統已經在系統 codebase 中完成目錄預留，與 Portal 首頁的預留連結。後續開發者接手時，請依照下列模型規範疊加程式碼：
+
+### 📁 目錄結構擴充
+所有 Phase 2 的 Domain 模組皆已對應置放於 `app/modules/` 底下：
+
+- **`app/modules/warehouse/`** 倉庫管理
+  - **系統目標**：貨物分類後進入倉庫的登記、出貨到店鋪的登記。
+  - **檔案建立指南**：
+    - `models.py`: 建立 `WarehouseItem` (庫存表), `StockTransaction` (進出庫明細)
+    - `forms.py`: 建立 `ItemInForm` (入庫表單), `ItemOutForm` (出庫表單)
+    - `routes.py`: 建議建立 `warehouse_bp` (Blueprint) 並綁定 URL `/warehouse`
+
+- **`app/modules/workshop/`** 工坊登記系統
+  - **系統目標**：貨到登記箱數、開箱使用 OCR 掃描並登記寄件人資訊。
+  - **檔案建立指南**：
+    - `models.py`: 建立 `DonationBox` (包裹分類物件), `DonorInfo` (寄件人資料表)
+    - `forms.py`: 建立 `PackageReceiptForm` (收件表單), `OCRVerifyForm` (OCR 辨識資料修正與校驗)
+
+- **`app/modules/accommodation/`** 住宿登錄系統
+  - **系統目標**：設定多個住宿地點、每個住宿地點的房間數量、類型、可容納人數、登記住宿時段。
+  - **檔案建立指南**：
+    - `models.py`: 建立 `AccommodationLocation` (住宿地點表), `Room` (房間類別與容納限制), `Booking` (住宿時段檔期登記表)
+    - `forms.py`: `LocationSetupForm`, `RoomSetupForm`, `BookingForm`
+
+- **`app/modules/volunteer/`** 志工與活動管理系統
+  - **系統目標**：開設活動、登錄志工信息、生成該活動志工的感謝狀 / 證明狀 (系統需可設定多個活動與不同的證書模板)。
+  - **檔案建立指南**：
+    - `models.py`: 建立 `VolunteerActivity` (活動主檔表), `Volunteer` (志工檔), `CertificateTemplate` (感謝狀前端樣板與參數欄位)
+    - `forms.py`: `ActivityForm`, `VolunteerEnrollForm`, `CertificateConfigForm`
+
+### 🔧 路由與 RBAC 權限層面調用
+1. **註冊藍圖**：將上述模組內的 `routes.py` 所生成的 `X_bp`，統一放入 `app/routes/__init__.py` 或 `create_app()` 中執行路由註冊。
+2. **存取權限控管**：系統底層 RBAC 已經在 `app/modules/auth/models.py` 的 `Permission` 類別中預留好了四大常數：`ACCESS_WAREHOUSE`, `ACCESS_WORKSHOP`, `ACCESS_ACCOMMODATION`, `ACCESS_VOLUNTEER`。
+3. 未來新增之 Controller (MethodView) 類別請務必在 `get()` 或 `post()` 附帶對應的權限檢查邏輯：
+    ```python
+    if not current_user.can(Permission.ACCESS_WORKSHOP):
+        abort(403)
+    ```
+    確保不同職務的模組人員彼此獨立不受干擾。
