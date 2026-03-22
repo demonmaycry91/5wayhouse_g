@@ -11,52 +11,22 @@
     </div>
 
     <!-- Phase 1: 實體店鋪營運 (Ready) -->
-    <h3 class="fw-bold mb-4 border-bottom pb-2">🈺 實體據點營運</h3>
+    <h3 class="fw-bold mb-4 border-bottom pb-2">🈺 現有營運系統</h3>
     <div class="row g-4 mb-5">
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 shadow-sm border-0 border-top border-primary border-4 rounded-4 hover-lift">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-3 me-3">
-                            <i class="bi bi-cart-check fs-2"></i>
+                            <i class="bi bi-shop fs-2"></i>
                         </div>
-                        <h4 class="card-title fw-bold mb-0">POS 收銀終端</h4>
+                        <h4 class="card-title fw-bold mb-0">實體據點營運</h4>
                     </div>
-                    <p class="card-text text-muted mb-4">實體店鋪的結帳作業、掃描條碼與發票紀錄，支援多種自動折扣策略。</p>
-                    <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-outline-primary stretched-link w-100 rounded-pill">進入系統 <i class="bi bi-arrow-right ms-1"></i></a>
+                    <p class="card-text text-muted mb-4">包含各據點的 POS 收銀終端、每日交班日報表、業績報表彙算與進階系統設定。</p>
+                    <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-outline-primary stretched-link w-100 rounded-pill">進入營業系統 <i class="bi bi-arrow-right ms-1"></i></a>
                 </div>
             </div>
         </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-success border-4 rounded-4 hover-lift">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-success bg-opacity-10 text-success rounded-circle p-3 me-3">
-                            <i class="bi bi-bar-chart fs-2"></i>
-                        </div>
-                        <h4 class="card-title fw-bold mb-0">營業報表與管理</h4>
-                    </div>
-                    <p class="card-text text-muted mb-4">查詢每個據點的交班日報表、營收總計，以及執行合併報表試算結算。</p>
-                    <a href="{{ url_for('report.query') }}" class="btn btn-outline-success w-100 rounded-pill" style="position: relative; z-index: 2;">查詢報表</a>
-                </div>
-            </div>
-        </div>
-        {% if current_user.has_role('Admin') %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4 rounded-4 hover-lift">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-3 me-3">
-                            <i class="bi bi-gear fs-2"></i>
-                        </div>
-                        <h4 class="card-title fw-bold mb-0">系統後台設定</h4>
-                    </div>
-                    <p class="card-text text-muted mb-4">據點管理、使用者權限控制、分類目錄設置，以及雲端備份關聯授權。</p>
-                    <a href="{{ url_for('admin.list_locations') }}" class="btn btn-outline-danger w-100 rounded-pill" style="position: relative; z-index: 2;">進入設定</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     <!-- Phase 2: 未來營運計畫 (Coming Soon) -->
