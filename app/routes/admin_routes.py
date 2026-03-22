@@ -24,7 +24,9 @@ from app.modules.auth.forms import LoginForm, UserForm, RoleForm
 from app.modules.store.forms import LocationForm, CategoryForm
 from app.modules.daily_ops.forms import StartDayForm, CloseDayForm, ConfirmReportForm, SettlementForm
 from app.modules.report.forms import ReportQueryForm
-from app.modules.system.forms import GoogleSettingsForm
+from app.modules.system.forms import GlobalSettingsForm
+
+from app.services.google_service import GoogleIntegrationService
 
 from app.core.extensions import db, login_manager, csrf
 from app.core.decorators import admin_required
@@ -430,6 +432,79 @@ class ForceCloseQueryView(AdminBaseView):
         return render_template('admin/force_close_query.html', form=form, results=results)
 
 # ==========================================
+# System Settings & Backup Views
+# ==========================================
+class SystemSettingsView(AdminBaseView):
+    def get(self):
+        form = GlobalSettingsForm()
+        
+        form.drive_folder_name.data = SystemSetting.get('drive_folder_name', '5WayHouse_POS_Reports')
+        form.sheets_filename_format.data = SystemSetting.get('sheets_filename_format', '{location_name}_{year}_業績')
+        
+        backup_files_str = SystemSetting.get('instance_backup_files', '["app.db"]')
+        try:
+            backup_files = json.loads(backup_files_str)
+        except json.JSONDecodeError:
+            backup_files = ['app.db']
+        
+        form.backup_db.data = 'app.db' in backup_files
+        form.backup_token.data = 'token.json' in backup_files
+        form.backup_client_secret.data = 'client_secret.json' in backup_files
+        
+        form.backup_frequency.data = SystemSetting.get('instance_backup_frequency', 'off')
+        form.backup_interval_minutes.data = int(SystemSetting.get('instance_backup_interval_minutes', '60'))
+
+        is_connected = GoogleIntegrationService.is_authorized()
+        drive_account_email = None
+        if is_connected:
+            user_info = GoogleIntegrationService.get_drive_user_info(current_app)
+            if user_info and 'email' in user_info:
+                drive_account_email = user_info['email']
+
+        return render_template("admin/system_settings.html", is_connected=is_connected, form=form, drive_account_email=drive_account_email)
+
+    def post(self):
+        form = GlobalSettingsForm()
+        if form.validate_on_submit():
+            SystemSetting.set('drive_folder_name', form.drive_folder_name.data)
+            SystemSetting.set('sheets_filename_format', form.sheets_filename_format.data)
+
+            backup_files = []
+            if form.backup_db.data: backup_files.append('app.db')
+            if form.backup_token.data: backup_files.append('token.json')
+            if form.backup_client_secret.data: backup_files.append('client_secret.json')
+            SystemSetting.set('instance_backup_files', json.dumps(backup_files))
+            
+            SystemSetting.set('instance_backup_frequency', form.backup_frequency.data)
+            SystemSetting.set('instance_backup_interval_minutes', str(form.backup_interval_minutes.data) if form.backup_interval_minutes.data else '60')
+
+            flash('系統全域設定與備份細節已儲存！', 'success')
+            return redirect(url_for('admin.system_settings'))
+        return self.get()
+
+class RebuildBackupView(AdminBaseView):
+    def post(self):
+        unclosed = BusinessDay.query.filter(BusinessDay.status.in_(['OPEN', 'PENDING_REPORT'])).all()
+        if unclosed:
+            reasons = [f"{loc.location.name} ({'正在營業中' if loc.status == 'OPEN' else '報表待確認'})" for loc in unclosed]
+            flash(f"備份失敗：因為以下據點尚未完成日結: {', '.join(reasons)}", "danger")
+            return redirect(url_for('admin.system_settings'))
+
+        current_app.task_queue.enqueue('app.services.google_service.GoogleIntegrationService.rebuild_backup_task', args=(request.form.get('overwrite') == 'on',), job_timeout='30m')
+        flash('已成功提交完整備份請求！備份將在背景執行，請稍後至 Google Drive 查閱結果。', 'info')
+        return redirect(url_for('admin.system_settings'))
+
+class ManualInstanceBackupView(AdminBaseView):
+    def post(self):
+        try:
+            current_app.task_queue.enqueue('app.services.backup_service.BackupService.backup_instance_to_drive', job_timeout='10m')
+            flash('已成功提交手動備份請求！備份將在背景執行，請稍後至 Google Drive 查閱結果。', 'info')
+        except Exception as e:
+            flash(f'手動備份失敗：{e}', 'danger')
+            current_app.logger.error(f'手動備份失敗: {e}')
+        return redirect(url_for('admin.system_settings'))
+
+# ==========================================
 # Route Registrations
 # ==========================================
 bp.add_url_rule('/locations', view_func=LocationListView.as_view('list_locations'))
@@ -455,3 +530,7 @@ bp.add_url_rule('/roles/<int:role_id>/delete', view_func=RoleDeleteView.as_view(
 bp.add_url_rule('/force_close_day/<int:business_day_id>', view_func=ForceCloseDayView.as_view('force_close_day'))
 bp.add_url_rule('/force_close_day/new', view_func=NewForceCloseDayView.as_view('new_force_close_day'))
 bp.add_url_rule('/force_close_query', view_func=ForceCloseQueryView.as_view('force_close_query'))
+
+bp.add_url_rule('/system_settings', view_func=SystemSettingsView.as_view('system_settings'))
+bp.add_url_rule('/system_settings/rebuild_backup', view_func=RebuildBackupView.as_view('rebuild_backup'))
+bp.add_url_rule('/system_settings/manual_instance_backup', view_func=ManualInstanceBackupView.as_view('manual_instance_backup'))

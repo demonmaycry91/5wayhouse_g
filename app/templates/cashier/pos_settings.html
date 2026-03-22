@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import page_header with context %}
+{% block title %}店鋪營運環境設定{% endblock %}
+
+{% block content %}
+
+{{ page_header(
+title='店鋪營運設定 (POS)',
+subtitle='調整收銀台與店鋪營運相關的參數設定'
+) }}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <form method="POST" action="{{ url_for('cashier.settings') }}" class="settings-form">
+            {{ form.hidden_tag() }}
+            <div class="card mb-4 shadow-sm border-0 border-primary">
+                <div class="card-header bg-primary text-white fw-bold"><i class="bi bi-display"></i> POS 結帳系統互動體驗設定</div>
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        {{ form.pos_checkout_delay_seconds.label(class="form-label fw-bold") }}
+                        {{ form.pos_checkout_delay_seconds(class="form-control form-control-lg", type="number", min="1", max="60") }}
+                        <div class="form-text text-muted mt-2">
+                            結帳成功後，交易明細發票畫面將停滯在收銀機上的秒數。<br>
+                            若這段時間內收銀員點擊了數字或商品快捷鍵，系統仍會自動跳開舊明細、開啟新交易。
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 mb-5">
+                <button type="submit" class="btn btn-success btn-lg shadow-sm"><i class="bi bi-floppy"></i> 儲存店鋪環境設定</button>
+                <a href="{{ url_for('cashier.dashboard') }}" class="btn btn-outline-secondary mt-2">返回營業儀表板</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

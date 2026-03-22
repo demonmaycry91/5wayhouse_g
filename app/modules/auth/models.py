@@ -14,6 +14,10 @@ class Permission:
     VIEW_REPORTS = 'view_reports'
     OPERATE_POS = 'operate_pos'
     SYSTEM_SETTINGS = 'system_settings'
+    ACCESS_WAREHOUSE = 'access_warehouse'
+    ACCESS_WORKSHOP = 'access_workshop'
+    ACCESS_ACCOMMODATION = 'access_accommodation'
+    ACCESS_VOLUNTEER = 'access_volunteer'
 
 PERMISSION_DESCRIPTIONS = {
     'MANAGE_USERS': '新增、編輯與刪除使用者帳號',
@@ -21,7 +25,11 @@ PERMISSION_DESCRIPTIONS = {
     'MANAGE_LOCATIONS': '新增、編輯營業據點與管理商品類別、打折規則',
     'VIEW_REPORTS': '檢視營運報表、執行合併日結與上傳/驗證銀行存款收據',
     'OPERATE_POS': '登入據點收銀台、執行日常開帳、收銀結帳與單點日結盤點',
-    'SYSTEM_SETTINGS': '設定系統進階選項（如修改密碼、Google Drive 雲端同步設定）'
+    'SYSTEM_SETTINGS': '設定系統進階選項（如修改密碼、Google Drive 雲端同步設定）',
+    'ACCESS_WAREHOUSE': '[開發中] 允許存取倉庫物流管理系統',
+    'ACCESS_WORKSHOP': '[開發中] 允許存取工坊與 OCR 物資登錄系統',
+    'ACCESS_ACCOMMODATION': '[開發中] 允許存取住宿房間與檔期登錄系統',
+    'ACCESS_VOLUNTEER': '[開發中] 允許存取志工與活動管理系統生成證書'
 }
 
 class Role(db.Model):

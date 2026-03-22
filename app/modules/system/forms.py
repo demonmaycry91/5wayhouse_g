@@ -2,7 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, BooleanField, RadioField, IntegerField, SubmitField
 from wtforms.validators import DataRequired, Optional, NumberRange
 
-class GoogleSettingsForm(FlaskForm):
+class GlobalSettingsForm(FlaskForm):
     drive_folder_name = StringField(
         'Google Drive 資料夾名稱',
         validators=[DataRequired(message="請輸入資料夾名稱。")],
@@ -28,7 +28,9 @@ class GoogleSettingsForm(FlaskForm):
         default='off'
     )
     backup_interval_minutes = IntegerField('間隔分鐘數 (僅適用於固定間隔)', validators=[Optional(), NumberRange(min=1)])
+    submit = SubmitField('儲存全域設定')
 
+class POSSettingsForm(FlaskForm):
     # POS UI Settings
     pos_checkout_delay_seconds = IntegerField('POS 結帳完成明細停留秒數', default=3, validators=[Optional(), NumberRange(min=1, max=60)])
-    submit = SubmitField('儲存設定')
+    submit = SubmitField('儲存店鋪營運設定')

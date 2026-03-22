@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import page_header with context %}
+{% block title %}全域系統設定{% endblock %}
+
+{% block content %}
+
+{{ page_header(
+title='全域系統與備份設定',
+subtitle='最高管理員專用：管理 Google 帳號連結、自動化雲端備份排程與資料庫維護選項'
+) }}
+
+<div class="row">
+    <div class="col-lg-8">
+        {# --- Google 帳號連結狀態 --- #}
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-light fw-bold"><i class="bi bi-google text-danger"></i> Google 雲端硬碟連結授權</div>
+            <div class="card-body">
+                {% if is_connected %}
+                <p class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> 狀態：已連結至您的 Google 帳號。</p>
+                <p>目前連結的帳號：<strong>{{ drive_account_email or '無法讀取 email' }}</strong></p>
+                <p class="text-muted"><small>所有營運報表與資料庫檔案將有權限自動化備份至您的 Google Drive 隱私空間。</small></p>
+                <a href="{{ url_for('google.authorize_drive') }}" class="btn btn-outline-warning btn-sm">重新授權 (更換帳號)</a>
+                {% else %}
+                <p class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> 狀態：尚未連結 Google 帳號！</p>
+                <p>為了確保營運資料安全不遺失，請登入您的 Google 工作帳號並授權存取 Drive 以啟動自動化雲端備份金庫。</p>
+                <a href="{{ url_for('google.authorize_drive') }}" class="btn btn-primary">點此安全連結 Google 帳號 <i class="bi bi-box-arrow-up-right"></i></a>
+                {% endif %}
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin.system_settings') }}" class="settings-form">
+            {{ form.hidden_tag() }}
+
+            {# --- Google Sheets 報表備份設定區塊 --- #}
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-light fw-bold"><i class="bi bi-folder text-warning"></i> 雲端目錄與報表格式設定</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        {{ form.drive_folder_name.label(class="form-label fw-bold") }}
+                        {{ form.drive_folder_name(class="form-control") }}
+                        <div class="form-text">{{ form.drive_folder_name.description }}</div>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.sheets_filename_format.label(class="form-label fw-bold") }}
+                        {{ form.sheets_filename_format(class="form-control") }}
+                        <div class="form-text">{{ form.sheets_filename_format.description }}</div>
+                    </div>
+                </div>
+            </div>
+
+            {# --- 系統層級備份設定 --- #}
+            <div class="card mb-4 shadow-sm border-0 border-primary">
+                <div class="card-header bg-primary text-white fw-bold"><i class="bi bi-shield-check"></i> 資料庫與系統實體檔案備份排程</div>
+                <div class="card-body">
+                    <div class="alert alert-info border-0 bg-light text-dark">
+                        <i class="bi bi-info-circle text-primary"></i> <strong>系統實體檔案機制：</strong> 會將伺服器的 SQLite 資料庫壓縮為 ZIP 封存檔並上傳至上述設定的 Google Drive 中。
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">啟用備份核心檔案：</label>
+                        <div class="form-check form-switch mb-2">
+                            {{ form.backup_db(class="form-check-input") }}
+                            {{ form.backup_db.label(class="form-check-label") }}
+                            <div class="form-text text-success">內含交易紀錄、使用者資料、權限分配等本源物件 (app.db)。<b>強烈建議常規開啟</b>。</div>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            {{ form.backup_token(class="form-check-input") }}
+                            {{ form.backup_token.label(class="form-check-label") }}
+                        </div>
+                        <div class="form-check form-switch">
+                            {{ form.backup_client_secret(class="form-check-input") }}
+                            {{ form.backup_client_secret.label(class="form-check-label") }}
+                        </div>
+                    </div>
+
+                    <div class="mb-4 border-top pt-3">
+                        <label class="form-label fw-bold text-success"><i class="bi bi-clock-history"></i> 自動化打包備份觸發時機：</label>
+                        <div class="mb-3 d-flex flex-wrap gap-4 mt-2">
+                            {% for subfield in form.backup_frequency %}
+                            <div class="form-check form-check-inline">
+                                {{ subfield(class="form-check-input", onchange="toggleIntervalInput()") }}
+                                {{ subfield.label(class="form-check-label") }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="intervalInputWrapper" style="display: none;">
+                        {{ form.backup_interval_minutes.label(class="form-label fw-bold text-primary") }}
+                        <div class="input-group">
+                            {{ form.backup_interval_minutes(class="form-control") }}
+                            <span class="input-group-text">分鐘一輪</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mb-5">
+                <button type="submit" class="btn btn-primary btn-lg shadow-sm"><i class="bi bi-cloud-arrow-up"></i> 套用並儲存全域系統策略</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Right Column: Manual Tools -->
+    <div class="col-lg-4">
+        <!-- Manual Backup Tools -->
+        <div class="card shadow-sm border-0 border-danger mb-4">
+            <div class="card-header bg-danger text-white fw-bold">
+                <i class="bi bi-exclamation-triangle-fill"></i> 進階救災與維護工具
+            </div>
+            <div class="card-body">
+                <h6 class="fw-bold"><i class="bi bi-database-fill-up"></i> 強制背景上傳實體備份包 (ZIP)</h6>
+                <p class="text-muted small">立即將勾選的資料庫與憑證檔案在伺服器端壓縮，並硬性推送至 Google Drive 根目錄。此作業將在背景駐留約 1~2 分鐘不等，不會卡住網頁，您仍可隨時導航至其他頁面。</p>
+                <form method="POST" action="{{ url_for('admin.manual_instance_backup') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    {% if not is_connected %}
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-4" disabled>Google OAuth 尚未就緒</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-outline-danger w-100 mb-4" onclick="return confirm('確定要立即通知伺服器執行完整打包上傳嗎？');">立即開管路進行實體打包上傳</button>
+                    {% endif %}
+                </form>
+
+                <hr class="text-danger">
+
+                <h6 class="fw-bold mt-4"><i class="bi bi-bootstrap-reboot"></i> 重建所有分店歷史日結報表 (Sheets)</h6>
+                <p class="text-muted small">由系統底層掃描所有「已日結 (CLOSED)」狀態的營業紀錄，若發現雲端 Sheets 表格殘缺失聯，將被強制重新建立修補；若欲覆寫良好報表，請勾選下方選項。</p>
+                <form method="POST" action="{{ url_for('admin.rebuild_backup') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="overwrite" name="overwrite">
+                        <label class="form-check-label small text-danger fw-bold" for="overwrite">
+                            強制洗掉並硬覆寫現存的 Sheets 報表試算表
+                        </label>
+                    </div>
+                    {% if not is_connected %}
+                    <button type="button" class="btn btn-secondary w-100 shadow-sm" disabled>操作拒絕：Google 認證中斷</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-danger w-100 shadow-sm" onclick="return confirm('嚴重警告：若勾選覆寫，將會清除並重建雲端空間內過去的所有同名報表！！\n\n您確定這就是您想要的復原情境嗎？');"><i class="bi bi-arrow-repeat"></i> 發起大批次日結重建洗滌</button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleIntervalInput() {
+        var intervalRadio = document.querySelector('input[name="backup_frequency"][value="interval"]');
+        var wrapper = document.getElementById('intervalInputWrapper');
+        if(intervalRadio && intervalRadio.checked) {
+            wrapper.style.display = 'block';
+        } else {
+            wrapper.style.display = 'none';
+        }
+    }
+    document.addEventListener("DOMContentLoaded", toggleIntervalInput);
+</script>
+{% endblock %}
