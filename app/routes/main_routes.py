@@ -50,7 +50,7 @@ def check_module_permission(module_name: str) -> bool:
         return current_user.has_role('Manager')
     
     perms_map = {
-        'pos': 'operate_pos',
+        'pos': 'pos_operate_cashier',
         'warehouse': 'access_warehouse',
         'workshop': 'access_workshop',
         'accommodation': 'access_accommodation',

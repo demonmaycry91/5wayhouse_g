@@ -63,14 +63,31 @@ def get_date_range_from_period(time_unit, year=None, month=None, quarter=None, p
 # ==========================================
 # Base View
 # ==========================================
-class ReportBaseView(MethodView):
-    """Base class for all report views. Automatically applies login and admin required."""
-    decorators = [login_required, admin_required]
 
+from functools import wraps
+from flask import abort
+
+def require_permission(perm):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.can(perm):
+                from flask import flash, redirect, url_for
+                flash(f"存取遭拒：您不具備報表模組的進階權限。 ({perm})", "danger")
+                return redirect(url_for('main.index'))
+            return f(*args, **kwargs)
+        return decorator
+    return decorator
+
+class ReportQueryAuthorizedView(MethodView):
+    decorators = [login_required, require_permission('report_view_daily')]
+
+class ReportConsolidatedAuthorizedView(MethodView):
+    decorators = [login_required, require_permission('report_consolidated')]
 # ==========================================
 # Views
 # ==========================================
-class ReportQueryView(ReportBaseView):
+class ReportQueryView(ReportQueryAuthorizedView):
     def get(self):
         form = ReportQueryForm()
         all_categories = Category.query.all()
@@ -295,7 +312,7 @@ class ReportQueryView(ReportBaseView):
         return render_template('report/query.html', form=form, results=results, report_type=report_type, grand_total=grand_total, chart_data=json.dumps(chart_data) if chart_data else None, total_revenue=total_revenue, denominations=DENOMINATIONS, all_categories=[{'id': c.id, 'name': c.name, 'category_type': c.category_type} for c in all_categories])
 
 
-class SaveDailySummaryDataView(ReportBaseView):
+class SaveDailySummaryDataView(ReportQueryAuthorizedView):
     decorators = [login_required, admin_required, csrf.exempt]
     def post(self):
         try:
@@ -311,7 +328,7 @@ class SaveDailySummaryDataView(ReportBaseView):
             db.session.rollback()
             return jsonify({'success': False, 'message': str(e)}), 500
 
-class SaveCashCheckDataView(ReportBaseView):
+class SaveCashCheckDataView(ReportQueryAuthorizedView):
     decorators = [login_required, admin_required, csrf.exempt]
     def post(self):
         try:
@@ -331,7 +348,7 @@ class SaveCashCheckDataView(ReportBaseView):
             db.session.rollback()
             return jsonify({'success': False, 'message': f'更新失敗: {str(e)}'}), 500
 
-class SaveTransactionLogDataView(ReportBaseView):
+class SaveTransactionLogDataView(ReportQueryAuthorizedView):
     decorators = [login_required, admin_required, csrf.exempt]
     def post(self):
         try:
@@ -357,13 +374,13 @@ class SaveTransactionLogDataView(ReportBaseView):
             db.session.rollback()
             return jsonify({'success': False, 'message': str(e)}), 500
 
-class SaveDailyCashSummaryDataView(ReportBaseView):
+class SaveDailyCashSummaryDataView(ReportQueryAuthorizedView):
     decorators = [login_required, admin_required, csrf.exempt]
     def post(self):
         flash('錯誤：捐款與其他收入為累計欄位，無法手動修改。', 'danger')
         return jsonify({'success': False, 'message': '捐款與其他收入為累計欄位，無法手動修改。'}), 400
 
-class ExportCSVView(ReportBaseView):
+class ExportCSVView(ReportQueryAuthorizedView):
     def get(self):
         report_type = request.args.get('report_type')
         location_id = request.args.get('location_id')
@@ -487,7 +504,7 @@ class ExportCSVView(ReportBaseView):
         cw.writerows(results_to_write)
         return Response(si.getvalue().encode('utf-8-sig'), mimetype="text/csv", headers={"Content-disposition": f"attachment; filename={report_type}_{date.today().strftime('%Y%m%d')}.csv"})
 
-class SettlementView(ReportBaseView):
+class SettlementView(ReportConsolidatedAuthorizedView):
     def get(self):
         try: report_date = date.fromisoformat(request.args.get('date', date.today().isoformat()))
         except (ValueError, TypeError): report_date = date.today()
@@ -517,7 +534,7 @@ class SettlementView(ReportBaseView):
 
         return render_template('report/settlement.html', form=form, report_date=report_date, reports=reports, active_locations_ordered=[name for name in LOCATION_ORDER if name in reports], grand_total=grand_total, all_closed=not unclosed_locations, unclosed_locations=sorted(list(unclosed_locations)), is_settled=is_settled, finance_items=FINANCE_ITEMS, sales_items=SALES_ITEMS, settlement=daily_settlement)
 
-class SaveSettlementView(ReportBaseView):
+class SaveSettlementView(ReportConsolidatedAuthorizedView):
     def post(self):
         form = SettlementForm()
         if form.validate_on_submit():
@@ -540,7 +557,7 @@ class SaveSettlementView(ReportBaseView):
             flash("提交的資料有誤，請重試。 " + " ".join([f" '{getattr(form, field).label.text}': {error}" for field, errors in form.errors.items() for error in errors]), "warning")
             return redirect(url_for('report.settlement', date=form.date.data or date.today().isoformat()))
 
-class PrintSettlementView(ReportBaseView):
+class PrintSettlementView(ReportConsolidatedAuthorizedView):
     def get(self, date_str):
         try: report_date = date.fromisoformat(date_str)
         except (ValueError, TypeError): flash("無效的日期格式。", "danger"); return redirect(url_for('report.settlement'))
@@ -556,7 +573,7 @@ class PrintSettlementView(ReportBaseView):
         pdf_bytes = PDFGeneratorService.generate_pdf(html_to_render, request.url_root)
         return Response(pdf_bytes, mimetype="application/pdf", headers={"Content-Disposition": f"attachment;filename=settlement_report_{report_date.isoformat()}.pdf"})
 
-class SettlementStatusAPIView(ReportBaseView):
+class SettlementStatusAPIView(ReportConsolidatedAuthorizedView):
     def get(self):
         year, month = request.args.get('year', type=int), request.args.get('month', type=int)
         if not year or not month: return jsonify({"error": "Year and month are required"}), 400
@@ -582,7 +599,7 @@ class SettlementStatusAPIView(ReportBaseView):
             current_date += timedelta(days=1)
         return jsonify(response_data)
 
-class QueryStatusAPIView(ReportBaseView):
+class QueryStatusAPIView(ReportQueryAuthorizedView):
     def get(self):
         year, month = request.args.get('year', type=int), request.args.get('month', type=int)
         if not year or not month: return jsonify({"error": "Year and month are required"}), 400

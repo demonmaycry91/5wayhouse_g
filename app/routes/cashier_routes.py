@@ -43,19 +43,34 @@ def load_user(user_id):
 # ==========================================
 from functools import wraps
 
-def operate_pos_required(f):
+
+def require_pos_operate(f):
+    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not (current_user.has_role('Admin') or current_user.can('operate_pos')):
-            flash("權限不足，拒絕存取實體營運模組。系統已將您引導至首頁。", "danger")
-            return redirect(url_for('main.index'))
+        if not current_user.can('pos_operate_cashier'):
+            from flask import flash, redirect, url_for
+            flash("權限不足：您不具備「據點收銀台操作」權限。", "danger")
+            return redirect(url_for('cashier.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
-class CashierBaseView(MethodView):
-    """Base class for standard cashier views, requires login and POS access"""
-    decorators = [login_required, operate_pos_required]
+def require_report_view(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not (current_user.can('report_view_daily') or current_user.can('report_edit_daily') or current_user.can('pos_operate_cashier')):
+            from flask import flash, redirect, url_for
+            flash("權限不足：您不具備查閱據點日報表的權限。", "danger")
+            return redirect(url_for('cashier.dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
+class PosAuthorizedView(MethodView):
+    decorators = [login_required, require_pos_operate]
+
+class ReportAuthorizedView(MethodView):
+    decorators = [login_required, require_report_view]
 class AdminBaseView(MethodView):
     """Base class for admin views, requires login and admin privileges"""
     decorators = [login_required, admin_required]
@@ -64,10 +79,12 @@ class AdminBaseView(MethodView):
 # Authentication & Core Dashboard
 # ==========================================
 class IndexView(MethodView):
+    decorators = [login_required]
     def get(self):
         return redirect(url_for('main.index'))
 
-class DashboardView(CashierBaseView):
+class DashboardView(MethodView):
+    decorators = [login_required]
     def get(self):
         today = date.today()
         locations = (
@@ -77,6 +94,7 @@ class DashboardView(CashierBaseView):
             .order_by(Location.id)
             .all()
         )
+        locations = [loc for loc in locations if current_user.can_access_location(loc.slug)]
         locations_status = {}
         for location in locations:
             business_day = next(iter(location.business_days), None)
@@ -130,7 +148,7 @@ class LoginView(MethodView):
                     next_page = None 
             
             # Smart PBX Dispatcher
-            if user.has_role('Admin') or user.can('operate_pos'):
+            if user.has_role('Admin') or user.can('pos_operate_cashier') or user.can('report_view_daily'):
                 default_next = url_for("cashier.dashboard")
             elif user.can('access_warehouse'):
                 default_next = url_for("main.coming_soon", module_name='warehouse')
@@ -190,9 +208,9 @@ class SettingsView(MethodView):
 # ==========================================
 # POS & Daily Operations
 # ==========================================
-class StartDayView(CashierBaseView):
+class StartDayView(PosAuthorizedView):
     def get(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         today = date.today()
         if BusinessDay.query.filter_by(date=today, location_id=location.id).first():
             flash(f'據點 "{location.name}" 今日已開帳或已日結，無法重複操作。', "warning")
@@ -200,7 +218,7 @@ class StartDayView(CashierBaseView):
         return render_template("cashier/start_day_form.html", location=location, today_date=today.strftime("%Y-%m-%d"), form=StartDayForm())
 
     def post(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         today = date.today()
         form = StartDayForm()
         if form.validate_on_submit():
@@ -213,7 +231,7 @@ class StartDayView(CashierBaseView):
 
 class ReopenDayView(AdminBaseView):
     def post(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         today = date.today()
         business_day = BusinessDay.query.filter_by(date=today, location_id=location.id).first()
         
@@ -231,9 +249,9 @@ class ReopenDayView(AdminBaseView):
             flash(f'據點 "{location.name}" 已成功強制切回「營業中」，可以繼續進行 POS 操作。', "success")
         return redirect(url_for("cashier.dashboard"))
 
-class POSView(CashierBaseView):
+class POSView(PosAuthorizedView):
     def get(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         business_day = BusinessDay.query.filter_by(date=date.today(), location_id=location.id, status="OPEN").first()
         if not business_day:
             flash(f'據點 "{location.name}" 今日尚未開店營業。', "warning")
@@ -264,7 +282,7 @@ class POSView(CashierBaseView):
         response.headers['Expires'] = '0'
         return response
 
-class RecordTransactionView(CashierBaseView):
+class RecordTransactionView(PosAuthorizedView):
     decorators = [login_required, csrf.exempt]
     
     def post(self):
@@ -314,9 +332,9 @@ class RecordTransactionView(CashierBaseView):
             current_app.logger.error(f"記錄交易時發生錯誤: {e}", exc_info=True)
             return jsonify({"success": False, "error": "伺服器內部錯誤"}), 500
 
-class CloseDayView(CashierBaseView):
+class CloseDayView(PosAuthorizedView):
     def get(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         business_day = BusinessDay.query.filter(BusinessDay.date == date.today(), BusinessDay.location_id == location.id).filter(BusinessDay.status.in_(["OPEN", "PENDING_REPORT"])).first()
         if not business_day:
             flash(f'據點 "{location.name}" 今日並非營業中狀態，無法進行日結。', "warning")
@@ -324,7 +342,7 @@ class CloseDayView(CashierBaseView):
         return render_template("cashier/close_day_form.html", location=location, today_date=date.today().strftime("%Y-%m-%d"), denominations=[1000, 500, 200, 100, 50, 10, 5, 1], form=CloseDayForm())
 
     def post(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         business_day = BusinessDay.query.filter(BusinessDay.date == date.today(), BusinessDay.location_id == location.id).filter(BusinessDay.status.in_(["OPEN", "PENDING_REPORT"])).first()
         form = CloseDayForm()
         if form.validate_on_submit():
@@ -345,9 +363,9 @@ class CloseDayView(CashierBaseView):
                 flash(f"處理日結時發生錯誤：{e}", "danger")
         return self.get(location_slug)
 
-class DailyReportView(CashierBaseView):
+class DailyReportView(ReportAuthorizedView):
     def get(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         try:
             report_date = date.fromisoformat(request.args.get('date', date.today().isoformat()))
         except ValueError:
@@ -376,7 +394,7 @@ class DailyReportView(CashierBaseView):
 
         return render_template("cashier/daily_report.html", day=bd, other_income_total=other_income_total, expected_total=expected_total, difference=difference, form=ConfirmReportForm())
 
-class ConfirmReportView(CashierBaseView):
+class ConfirmReportView(ReportAuthorizedView):
     def post(self, location_slug):
         report_date_str = request.form.get('report_date')
         if not report_date_str:
@@ -385,7 +403,7 @@ class ConfirmReportView(CashierBaseView):
         try: report_date = date.fromisoformat(report_date_str)
         except ValueError: flash("日期格式無效。", "danger"); return redirect(url_for("cashier.dashboard"))
         
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         bd = BusinessDay.query.filter_by(date=report_date, location_id=location.id, status="PENDING_REPORT").first()
         if not bd:
             flash("找不到待確認的報表，或該報表已被確認。", "warning")
@@ -424,9 +442,9 @@ class ConfirmReportView(CashierBaseView):
                 flash(f"歸檔時發生錯誤：{e}", "danger")
         return redirect(url_for('cashier.daily_report', location_slug=location.slug, date=report_date.isoformat()))
 
-class PrintReportView(CashierBaseView):
+class PrintReportView(ReportAuthorizedView):
     def post(self, location_slug):
-        location = Location.query.filter_by(slug=location_slug).first_or_404()
+        location = get_authorized_location(location_slug)
         bd = BusinessDay.query.filter(BusinessDay.date == date.today(), BusinessDay.location_id == location.id).first_or_404()
         
         other_income_total = db.session.query(func.sum(TransactionItem.price)).join(TransactionItem.transaction).join(Transaction.business_day).join(TransactionItem.category).filter(

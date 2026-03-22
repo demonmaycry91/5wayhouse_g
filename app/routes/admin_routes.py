@@ -36,22 +36,47 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 # ==========================================
 # Base Views (OOP Inheritance)
 # ==========================================
-class AdminBaseView(MethodView):
-    """
-    Base class for all admin views.
-    Automatically applies login_required and admin_required to every method.
-    """
-    decorators = [login_required, admin_required]
 
+from functools import wraps
+from flask import abort
+
+def require_permission(perm):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.can(perm):
+                flash(f"存取遭拒：您不具備此系統管理模組的權限。 ({perm})", "danger")
+                return redirect(url_for('main.index'))
+            return f(*args, **kwargs)
+        return decorator
+    return decorator
+
+class AdminLocationsView(MethodView):
+    decorators = [login_required, require_permission('admin_locations')]
+
+class AdminUsersView(MethodView):
+    decorators = [login_required, require_permission('admin_users')]
+
+class AdminRolesView(MethodView):
+    decorators = [login_required, require_permission('admin_roles')]
+
+class AdminSystemView(MethodView):
+    decorators = [login_required, require_permission('admin_system')]
+
+class ReportEditDailyView(MethodView):
+    decorators = [login_required, require_permission('report_edit_daily')]
+
+class AdminBaseView(MethodView):
+    decorators = [login_required]
 # ==========================================
 # Location Management
 # ==========================================
-class LocationListView(AdminBaseView):
+class LocationListView(AdminLocationsView):
     def get(self):
         locations = Location.query.order_by(Location.id).all()
         return render_template('admin/locations.html', locations=locations)
 
-class LocationAddView(AdminBaseView):
+class LocationAddView(AdminLocationsView):
     def get(self):
         form = LocationForm()
         return render_template('admin/location_form.html', form=form, form_title='新增據點')
@@ -66,7 +91,7 @@ class LocationAddView(AdminBaseView):
             return redirect(url_for('admin.list_locations'))
         return render_template('admin/location_form.html', form=form, form_title='新增據點')
 
-class LocationEditView(AdminBaseView):
+class LocationEditView(AdminLocationsView):
     def get(self, location_id):
         location = Location.query.get_or_404(location_id)
         form = LocationForm(obj=location)
@@ -82,7 +107,7 @@ class LocationEditView(AdminBaseView):
             return redirect(url_for('admin.list_locations'))
         return render_template('admin/location_form.html', form=form, form_title='編輯據點')
 
-class LocationDeleteView(AdminBaseView):
+class LocationDeleteView(AdminLocationsView):
     def post(self, location_id):
         location = Location.query.get_or_404(location_id)
         if location.business_days:
@@ -110,7 +135,7 @@ def get_category_form_data(form, category):
     category.set_rules(rules) if rules else setattr(category, 'discount_rules', None)
 
 
-class CategoryListView(AdminBaseView):
+class CategoryListView(AdminLocationsView):
     decorators = [login_required, admin_required, csrf.exempt]
     
     def get(self, location_id):
@@ -182,7 +207,7 @@ class CategoryListView(AdminBaseView):
             flash(f'儲存失敗，發生錯誤：{e}', 'danger')
         return redirect(url_for('admin.list_categories', location_id=location.id))
 
-class CategoryAddView(AdminBaseView):
+class CategoryAddView(AdminLocationsView):
     def get(self, location_id):
         location = Location.query.get_or_404(location_id)
         form = CategoryForm(location_id=location.id)
@@ -200,7 +225,7 @@ class CategoryAddView(AdminBaseView):
             return redirect(url_for('admin.list_categories', location_id=location.id))
         return render_template('admin/category_form.html', form=form, form_title='新增商品類別', location=location)
 
-class CategoryEditView(AdminBaseView):
+class CategoryEditView(AdminLocationsView):
     def get(self, category_id):
         category = Category.query.get_or_404(category_id)
         location = category.location
@@ -222,7 +247,7 @@ class CategoryEditView(AdminBaseView):
             return redirect(url_for('admin.list_categories', location_id=location.id))
         return render_template('admin/category_form.html', form=form, form_title='編輯商品類別', location=location, category=category)
 
-class CategoryDeleteView(AdminBaseView):
+class CategoryDeleteView(AdminLocationsView):
     def post(self, category_id):
         category = Category.query.get_or_404(category_id)
         location_id = category.location_id
@@ -243,12 +268,12 @@ class CategoryDeleteView(AdminBaseView):
 # ==========================================
 # User and Role Management
 # ==========================================
-class UserListView(AdminBaseView):
+class UserListView(AdminUsersView):
     def get(self):
         users = User.query.order_by(User.id).all()
         return render_template('admin/users.html', users=users)
 
-class UserAddView(AdminBaseView):
+class UserAddView(AdminUsersView):
     def get(self):
         form = UserForm(user=None)
         return render_template('admin/user_form.html', form=form, form_title="建立新使用者")
@@ -266,7 +291,7 @@ class UserAddView(AdminBaseView):
             return redirect(url_for('admin.list_users'))
         return render_template('admin/user_form.html', form=form, form_title="建立新使用者")
 
-class UserEditView(AdminBaseView):
+class UserEditView(AdminUsersView):
     def get(self, user_id):
         user = User.query.get_or_404(user_id)
         form = UserForm(user=user, obj=user)
@@ -286,7 +311,7 @@ class UserEditView(AdminBaseView):
             return redirect(url_for('admin.list_users'))
         return render_template('admin/user_form.html', form=form, form_title="編輯使用者", user=user)
 
-class UserDeleteView(AdminBaseView):
+class UserDeleteView(AdminUsersView):
     def post(self, user_id):
         user = User.query.get_or_404(user_id)
         db.session.delete(user)
@@ -294,55 +319,62 @@ class UserDeleteView(AdminBaseView):
         flash('使用者已刪除。', 'success')
         return redirect(url_for('admin.list_users'))
 
-class RoleListView(AdminBaseView):
+class RoleListView(AdminRolesView):
     def get(self):
         roles = Role.query.order_by(Role.id).all()
         return render_template('admin/roles.html', roles=roles)
 
-class RoleAddView(AdminBaseView):
-    def _setup_choices(self, form):
-        form.permissions.choices = [(p, f"{p} ({PERMISSION_DESCRIPTIONS.get(p, '未知權限')})") for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
-
+class RoleAddView(AdminRolesView):
     def get(self):
         form = RoleForm()
-        self._setup_choices(form)
-        return render_template('admin/role_form.html', form=form, form_title="建立新角色")
+        from app.modules.auth.models import PERMISSION_STRUCTURE
+        return render_template('admin/role_form.html', form=form, form_title="建立新角色", permission_structure=PERMISSION_STRUCTURE, all_locations=Location.query.all())
 
     def post(self):
         form = RoleForm()
-        self._setup_choices(form)
         if form.validate_on_submit():
             role = Role(name=form.name.data, permissions=','.join(form.permissions.data))
+            
+            if form.locations.data:
+                role.locations = Location.query.filter(Location.id.in_(form.locations.data)).all()
+                
             db.session.add(role)
             db.session.commit()
             flash('新角色已建立。', 'success')
             return redirect(url_for('admin.list_roles'))
-        return render_template('admin/role_form.html', form=form, form_title="建立新角色")
+            
+        from app.modules.auth.models import PERMISSION_STRUCTURE
+        return render_template('admin/role_form.html', form=form, form_title="建立新角色", permission_structure=PERMISSION_STRUCTURE, all_locations=Location.query.all())
 
-class RoleEditView(AdminBaseView):
-    def _setup_choices(self, form):
-        form.permissions.choices = [(p, f"{p} ({PERMISSION_DESCRIPTIONS.get(p, '未知權限')})") for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
-
+class RoleEditView(AdminRolesView):
     def get(self, role_id):
         role = Role.query.get_or_404(role_id)
         form = RoleForm(obj=role)
-        self._setup_choices(form)
         form.permissions.data = role.get_permissions()
-        return render_template('admin/role_form.html', form=form, form_title="編輯角色")
+        form.locations.data = [loc.id for loc in role.locations]
+        
+        from app.modules.auth.models import PERMISSION_STRUCTURE
+        return render_template('admin/role_form.html', form=form, form_title="編輯角色", permission_structure=PERMISSION_STRUCTURE, all_locations=Location.query.all())
 
     def post(self, role_id):
         role = Role.query.get_or_404(role_id)
         form = RoleForm(obj=role)
-        self._setup_choices(form)
         if form.validate_on_submit():
             role.name = form.name.data
             role.permissions = ','.join(form.permissions.data)
+            
+            role.locations = []
+            if form.locations.data:
+                role.locations = Location.query.filter(Location.id.in_(form.locations.data)).all()
+                
             db.session.commit()
             flash('角色已更新。', 'success')
             return redirect(url_for('admin.list_roles'))
-        return render_template('admin/role_form.html', form=form, form_title="編輯角色")
+            
+        from app.modules.auth.models import PERMISSION_STRUCTURE
+        return render_template('admin/role_form.html', form=form, form_title="編輯角色", permission_structure=PERMISSION_STRUCTURE, all_locations=Location.query.all())
 
-class RoleDeleteView(AdminBaseView):
+class RoleDeleteView(AdminRolesView):
     def post(self, role_id):
         role = Role.query.get_or_404(role_id)
         db.session.delete(role)
@@ -353,7 +385,7 @@ class RoleDeleteView(AdminBaseView):
 # ==========================================
 # Force Close Operations
 # ==========================================
-class ForceCloseDayView(AdminBaseView):
+class ForceCloseDayView(ReportEditDailyView):
     def get(self, business_day_id):
         bd = BusinessDay.query.get_or_404(business_day_id)
         return render_template('admin/force_close_day.html', location=bd.location, today_date=bd.date.strftime("%Y-%m-%d"), denominations=[1000, 500, 200, 100, 50, 10, 5, 1], form=CloseDayForm())
@@ -482,7 +514,7 @@ class SystemSettingsView(AdminBaseView):
             return redirect(url_for('admin.system_settings'))
         return self.get()
 
-class RebuildBackupView(AdminBaseView):
+class RebuildBackupView(AdminSystemView):
     def post(self):
         unclosed = BusinessDay.query.filter(BusinessDay.status.in_(['OPEN', 'PENDING_REPORT'])).all()
         if unclosed:
@@ -494,7 +526,7 @@ class RebuildBackupView(AdminBaseView):
         flash('已成功提交完整備份請求！備份將在背景執行，請稍後至 Google Drive 查閱結果。', 'info')
         return redirect(url_for('admin.system_settings'))
 
-class ManualInstanceBackupView(AdminBaseView):
+class ManualInstanceBackupView(AdminSystemView):
     def post(self):
         try:
             current_app.task_queue.enqueue('app.services.backup_service.BackupService.backup_instance_to_drive', job_timeout='10m')

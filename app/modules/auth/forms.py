@@ -1,7 +1,11 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, SelectMultipleField, widgets
 from wtforms.validators import DataRequired, Length, Regexp, EqualTo, ValidationError
-from .models import User, Role
+from .models import User, Role, PERMISSION_STRUCTURE
+
+class MultiCheckboxField(SelectMultipleField):
+    widget = widgets.ListWidget(prefix_label=False)
+    option_widget = widgets.CheckboxInput()
 
 class LoginForm(FlaskForm):
     username = StringField('帳號', validators=[DataRequired(message="請輸入帳號。")])
@@ -10,13 +14,20 @@ class LoginForm(FlaskForm):
 
 class RoleForm(FlaskForm):
     name = StringField('角色名稱', validators=[DataRequired(), Length(1, 64)])
-    permissions = SelectMultipleField(
-        '權限', 
-        coerce=str, 
-        widget=widgets.ListWidget(prefix_label=False), 
-        option_widget=widgets.CheckboxInput()
-    )
+    permissions = MultiCheckboxField('功能權限', coerce=str)
+    locations = MultiCheckboxField('授權存取據點', coerce=int)
     submit = SubmitField('儲存')
+
+    def __init__(self, *args, **kwargs):
+        super(RoleForm, self).__init__(*args, **kwargs)
+        all_perms = []
+        for group, perms in PERMISSION_STRUCTURE.items():
+            for key, desc in perms.items():
+                all_perms.append((key, desc))
+        self.permissions.choices = all_perms
+        
+        from app.modules.store.models import Location
+        self.locations.choices = [(loc.id, loc.name) for loc in Location.query.all()]
 
 class UserForm(FlaskForm):
     username = StringField('使用者名稱', validators=[DataRequired(), Length(1, 64), Regexp('^[A-Za-z][A-Za-z0-9_.]*$', 0, '使用者名稱只能包含字母、數字、點或底線')])

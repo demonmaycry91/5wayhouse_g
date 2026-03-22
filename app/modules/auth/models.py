@@ -1,3 +1,4 @@
+# app/modules/auth/models.py
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.core.extensions import db
@@ -7,36 +8,42 @@ roles_users = db.Table('roles_users',
     db.Column('role_id', db.Integer, db.ForeignKey('role.id'), primary_key=True)
 )
 
-class Permission:
-    MANAGE_USERS = 'manage_users'
-    MANAGE_ROLES = 'manage_roles'
-    MANAGE_LOCATIONS = 'manage_locations'
-    VIEW_REPORTS = 'view_reports'
-    OPERATE_POS = 'operate_pos'
-    SYSTEM_SETTINGS = 'system_settings'
-    ACCESS_WAREHOUSE = 'access_warehouse'
-    ACCESS_WORKSHOP = 'access_workshop'
-    ACCESS_ACCOMMODATION = 'access_accommodation'
-    ACCESS_VOLUNTEER = 'access_volunteer'
+roles_locations = db.Table('roles_locations',
+    db.Column('role_id', db.Integer, db.ForeignKey('role.id'), primary_key=True),
+    db.Column('location_id', db.Integer, db.ForeignKey('location.id'), primary_key=True)
+)
 
-PERMISSION_DESCRIPTIONS = {
-    'MANAGE_USERS': '新增、編輯與刪除使用者帳號',
-    'MANAGE_ROLES': '設定系統角色與分配各項權限',
-    'MANAGE_LOCATIONS': '新增、編輯營業據點與管理商品類別、打折規則',
-    'VIEW_REPORTS': '檢視營運報表、執行合併日結與上傳/驗證銀行存款收據',
-    'OPERATE_POS': '登入據點收銀台、執行日常開帳、收銀結帳與單點日結盤點',
-    'SYSTEM_SETTINGS': '設定系統進階選項（如修改密碼、Google Drive 雲端同步設定）',
-    'ACCESS_WAREHOUSE': '[開發中] 允許存取倉庫物流管理系統',
-    'ACCESS_WORKSHOP': '[開發中] 允許存取工坊與 OCR 物資登錄系統',
-    'ACCESS_ACCOMMODATION': '[開發中] 允許存取住宿房間與檔期登錄系統',
-    'ACCESS_VOLUNTEER': '[開發中] 允許存取志工與活動管理系統生成證書'
+PERMISSION_STRUCTURE = {
+    '營運功能模組 (POS & Ops)': {
+        'pos_operate_cashier': '據點收銀台操作 (開帳/收銀/結帳)',
+        'pos_settings': 'POS 端運營環境設定',
+    },
+    '報表與財務模組 (Reports & Finance)': {
+        'report_view_daily': '查閱各據點每日報表',
+        'report_edit_daily': '各據點當日結算與補登日結',
+        'report_consolidated': '合併報表總結算',
+        'report_ocr_verify': '銀行存款收據 OCR 驗證',
+    },
+    '系統管理後台 (System Admin)': {
+        'admin_users': '使用者與角色管理',
+        'admin_locations': '據點與商品類別管理',
+        'admin_system': '系統全域設定與雲端備份配置',
+    },
+    '下一階段模組 (Future Phases)': {
+        'access_warehouse': '存取倉庫物流管理系統',
+        'access_workshop': '存取工坊物資登錄系統',
+        'access_accommodation': '存取住宿時段登錄系統',
+        'access_volunteer': '存取志工與活動管理系統',
+    }
 }
 
 class Role(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True, nullable=False)
     permissions = db.Column(db.Text, nullable=True)
+    
     users = db.relationship('User', secondary=roles_users, back_populates='roles')
+    locations = db.relationship('Location', secondary=roles_locations, backref=db.backref('roles', lazy='dynamic'))
 
     def __repr__(self):
         return f'<Role {self.name}>'
@@ -52,6 +59,7 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=True)
     google_id = db.Column(db.String(120), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(200), nullable=True)
+    
     roles = db.relationship('Role', secondary=roles_users, back_populates='users', lazy='dynamic')
 
     def set_password(self, password):
@@ -66,10 +74,23 @@ class User(db.Model, UserMixin):
         return self.roles.filter_by(name=role_name).first() is not None
 
     def can(self, permission_name):
+        # Admin bypasses all checks
+        if self.has_role('Admin'):
+            return True
         for role in self.roles:
             perms = [p.lower().strip() for p in role.get_permissions()]
             if permission_name.lower().strip() in perms:
                 return True
+        return False
+        
+    def can_access_location(self, location_id_or_slug):
+        # Admin bypasses all specific location locks
+        if self.has_role('Admin'):
+            return True
+        for role in self.roles:
+            for loc in role.locations:
+                if str(loc.id) == str(location_id_or_slug) or loc.slug == location_id_or_slug:
+                    return True
         return False
 
     def __repr__(self):

@@ -7,43 +7,101 @@
 {{ page_header(
     title=form_title,
     button_url=url_for('admin.list_roles'),
-    button_text='返回列表'
+    button_text='返回角色列表'
 ) }}
 
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="card">
-            <div class="card-body">
+    <div class="col-xl-10 col-lg-12">
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body p-4 p-md-5">
                 <form method="POST" action="">
                     {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.name.label(class="form-label") }}
-                        {{ form.name(class="form-control") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.permissions.label(class="form-label") }}
-                        <div class="border rounded p-2">
-                            {# --- 修正點：手動迭代以移除 bullet points --- #}
-                            {% for subfield in form.permissions %}
-                                <div class="form-check mb-2">
-                                    {{ subfield(class="form-check-input", style="margin-top: 0.3rem;") }}
-                                    <label class="form-check-label w-100" for="{{ subfield.id }}">
-                                        {% set label_parts = subfield.label.text.split(' (') %}
-                                        <div class="fw-bold text-primary">{{ label_parts[0] }}</div>
-                                        {% if label_parts|length > 1 %}
-                                        <div class="text-muted small">{{ label_parts[1][:-1] }}</div>
-                                        {% endif %}
-                                    </label>
-                                </div>
+                    
+                    <!-- Role Name -->
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            {{ form.name.label(class="form-label fw-bold text-dark fs-5") }}
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-light border-0 text-muted"><i class="bi bi-person-badge"></i></span>
+                                {{ form.name(class="form-control bg-light border-0", placeholder="例如：壽豐店長、倉庫管理專員等") }}
+                            </div>
+                            {% for error in form.name.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="d-grid">
-                        {{ form.submit(class="btn btn-primary") }}
+                    
+                    <div class="row g-5 mb-4">
+                        <!-- Permissions Modules Tree -->
+                        <div class="col-lg-8 border-end border-light">
+                            <label class="form-label fw-bold text-dark fs-5 mb-1"><i class="bi bi-shield-lock-fill text-success me-2"></i>系統功能模組授權配置</label>
+                            <p class="text-muted small mb-4">請分別展開模組，勾選此角色被允許存取的「所有按鈕與入口功能」。未打勾者將無法進入對應端點。</p>
+                            
+                            <div class="row g-3">
+                            {% for group, perms in permission_structure.items() %}
+                                <div class="col-md-6">
+                                    <div class="card h-100 border border-light bg-white rounded-4 shadow-sm hover-shadow transition-all">
+                                        <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+                                            <h6 class="fw-bold text-primary mb-0">{{ group }}</h6>
+                                        </div>
+                                        <div class="card-body pt-2 pb-3">
+                                            {% for key, desc in perms.items() %}
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" name="permissions" value="{{ key }}" id="perm_{{ key }}" {% if form.permissions.data and key in form.permissions.data %}checked{% endif %}>
+                                                <label class="form-check-label text-dark small" style="cursor: pointer;" for="perm_{{ key }}">{{ desc }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Location Limits Binding -->
+                        <div class="col-lg-4">
+                            <label class="form-label fw-bold text-dark fs-5 mb-1"><i class="bi bi-geo-alt-fill text-danger me-2"></i>營運據點存取邊界防護</label>
+                            <p class="text-muted small mb-4">實體店鋪操作與查閱紀錄時，此角色最遠只能查閱/登錄選中的分店。留白視同無任何存取權限！</p>
+                            
+                            <div class="card border-0 bg-danger bg-opacity-10 rounded-4 shadow-sm p-4">
+                                <div class="fw-bold text-danger mb-3 border-bottom border-danger pb-2 opacity-75">全域已註冊據點</div>
+                                
+                                <div class="location-scroll-area">
+                                    {% for loc in all_locations %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input border-danger" type="checkbox" name="locations" value="{{ loc.id }}" id="loc_{{ loc.id }}" {% if form.locations.data and loc.id in form.locations.data %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold text-dark w-100" style="cursor: pointer;" for="loc_{{ loc.id }}">
+                                            {{ loc.name }} <span class="badge bg-white text-danger border border-danger ms-2 opacity-50">{{ loc.slug }}</span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                    {% if not all_locations %}
+                                    <div class="alert alert-light border-0 text-center small text-muted py-2 mb-0">無任何註冊據點資料。</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="text-muted opacity-25 my-5">
+                    
+                    <!-- Submit -->
+                    <div class="d-flex justify-content-end gap-3">
+                        <a href="{{ url_for('admin.list_roles') }}" class="btn btn-light btn-lg px-4 rounded-pill">取消變更</a>
+                        {{ form.submit(class="btn btn-primary btn-lg px-5 rounded-pill shadow-sm") }}
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.hover-shadow:hover {
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+.transition-all {
+    transition: all .2s ease-in-out;
+}
+</style>
 {% endblock %}
