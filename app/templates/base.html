@@ -26,13 +26,14 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     {% if request.blueprint != 'main' %}
                         {% if request.blueprint in ['cashier', 'report', 'admin'] %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('cashier.dashboard') }}">店鋪營運首頁</a>
                             </li>
-                            {% if current_user.is_authenticated and current_user.has_role('Admin') %}
+                            {% if current_user.has_role('Admin') or current_user.can('report_view_daily') %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('report.query') }}">報表查詢</a>
                             </li>
@@ -55,7 +56,6 @@
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
-                    {% if current_user.is_authenticated %}
                     
                     {# --- 模組專屬手冊 --- #}
                     <li class="nav-item dropdown">
@@ -131,16 +131,18 @@
                         {% endif %}
                     {% endif %}
                     
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('cashier.logout') }}">登出 ({{ current_user.username }})</a>
-                    </li>
                     
-                    {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('cashier.login') }}">登入</a>
+                        <a class="nav-link text-white fw-bold opacity-75 hover-opacity-100" href="{{ url_for('cashier.logout') }}">登出 ({{ current_user.username }})</a>
                     </li>
-                    {% endif %}
                 </ul>
+                {% else %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link text-white fw-bold btn btn-primary px-4 rounded-pill shadow-sm" href="{{ url_for('cashier.login') }}">登入入口</a>
+                    </li>
+                </ul>
+                {% endif %}
             </div>
         </div>
     </nav>

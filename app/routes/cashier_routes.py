@@ -291,40 +291,6 @@ class RecordTransactionView(PosAuthorizedView):
         if not items: return jsonify({"success": False, "error": "交易內容不可為空"}), 400
 
         try:
-            location = Location.query.filter_by(slug=location_slug).first()
-            business_day = BusinessDay.query.filter_by(date=date.today(), location_id=location.id, status="OPEN").first()
-            if not business_day: return jsonify({"success": False, "error": "找不到對應的營業中紀錄"}), 404
-
-            total_amount = sum(item['price'] for item in items)
-            total_sales_amount, total_items_count = 0, 0
-            
-            for item in items:
-                category = Category.query.get(item['category_id'])
-                if category and category.category_type in ['product', 'discount_fixed', 'discount_percent', 'buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even']:
-                    total_sales_amount += item['price']
-                if category and category.category_type == 'product':
-                    total_items_count += 1
-            
-            new_tx = Transaction(amount=total_amount, item_count=len(items), business_day_id=business_day.id, cash_received=data.get("cash_received"), change_given=data.get("change_given"))
-            db.session.add(new_tx)
-            
-            for item in items:
-                db.session.add(TransactionItem(price=item['price'], category_id=item['category_id'], transaction=new_tx))
-
-            business_day.total_sales = (business_day.total_sales or 0) + total_sales_amount
-            business_day.total_items = (business_day.total_items or 0) + total_items_count
-            business_day.total_transactions = (business_day.total_transactions or 0) + 1
-            db.session.commit()
-            
-            other_incomes = db.session.query(Category.name, func.sum(TransactionItem.price)) \
-                .join(TransactionItem.transaction).join(Transaction.business_day).join(TransactionItem.category) \
-                .filter(BusinessDay.id == business_day.id, Category.category_type == 'other_income') \
-                .group_by(Category.name).all()
-            
-            d_tot, o_tot = 0, 0
-            for name, tot in other_incomes:
-                if name == '捐款': d_tot = tot
-                else: o_tot += tot
 
             return jsonify({"success": True, "total_sales": business_day.total_sales, "total_items": business_day.total_items, "total_transactions": business_day.total_transactions, "donation_total": d_tot, "other_total": o_tot})
         except Exception as e:
@@ -377,14 +343,8 @@ class DailyReportView(ReportAuthorizedView):
             flash(f'找不到據點 "{location.name}" {report_date.strftime("%Y-%m-%d")} 的日結報表資料。', "warning")
             return redirect(url_for("cashier.dashboard"))
 
-        sales_total = db.session.query(func.sum(TransactionItem.price)).join(Transaction.items).join(TransactionItem.category).filter(
-            Transaction.business_day_id == bd.id,
-            Category.category_type.in_(['product', 'discount_fixed', 'discount_percent', 'buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even'])
-        ).scalar() or 0
-
-        other_income_total = db.session.query(func.sum(TransactionItem.price)).join(TransactionItem.transaction).join(Transaction.business_day).join(TransactionItem.category).filter(
-            BusinessDay.id == bd.id, Category.category_type == 'other_income'
-        ).scalar() or 0
+        from app.services.pos_service import POSService
+        sales_total, other_income_total = POSService.calculate_daily_totals(bd.id)
         
         expected_total = (bd.opening_cash or 0) + sales_total + other_income_total
         difference = (bd.closing_cash or 0) - expected_total
@@ -417,14 +377,8 @@ class ConfirmReportView(ReportAuthorizedView):
                 bd.signature_cashier = request.form.get('sig_cashier')
                 bd.status = "CLOSED"
                 
-                sales_total = db.session.query(func.sum(TransactionItem.price)).join(Transaction.items).join(TransactionItem.category).filter(
-                    Transaction.business_day_id == bd.id,
-                    Category.category_type.in_(['product', 'discount_fixed', 'discount_percent', 'buy_n_get_m', 'buy_x_get_x_minus_1', 'buy_odd_even'])
-                ).scalar() or 0
-                
-                other_income_total = db.session.query(func.sum(TransactionItem.price)).join(TransactionItem.transaction).join(Transaction.business_day).join(TransactionItem.category).filter(
-                    BusinessDay.id == bd.id, Category.category_type == 'other_income'
-                ).scalar() or 0
+                from app.services.pos_service import POSService
+                sales_total, other_income_total = POSService.calculate_daily_totals(bd.id)
                 
                 bd.total_sales = sales_total
                 bd.expected_cash = (bd.opening_cash or 0) + (bd.total_sales or 0) + other_income_total

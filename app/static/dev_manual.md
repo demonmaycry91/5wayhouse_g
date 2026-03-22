@@ -134,13 +134,15 @@ def create_app(config_name='development'):
 
 `app/modules/` 依商業領域拆分：每個子目錄是一個獨立的功能領域，包含自己的 models 和 forms。新增功能只需在 `modules/` 下建立新子目錄，不動到既有程式碼（高內聚、低耦合）。
 
-### 三層架構
+### 三層架構與服務層抽象化 (Service Layer)
 
 ```
 Routes（路由層）  →  Services（服務層）  →  Models（資料層）
-     ↑                                           ↑
+     ↑             (e.g., POSService)              ↑
 Templates（視圖）                         Extensions（DB, Login...）
 ```
+
+為了防止商業邏輯（如複雜的開盤對帳、現金沖梢等）對 HTTP Controller 造成污染與安全漏洞，系統自 Phase 5 起強制抽離重度運算至 `app/services/*.py`。這項結構隔離能確保未來擴充新模組時，結帳或報表計算邏輯可以跨檔案無縫複用，確保修改任一模組的介面時「永遠不會引發核心計算 Bug」。
 
 ---
 
@@ -612,10 +614,13 @@ cp .env.example .env
 # 請務必編輯 .env 檔案，填寫強密碼 SECRET_KEY 避免資安外流
 ```
 
-**步驟三、透過 Docker Compose 編譯與啟動服務**
+**步驟三、透過 Docker Compose 編譯與啟動服務 (自動化部署)**
 ```bash
-# 這將花費 2~5 分鐘下載並編譯 Python 與必要的 OCR/PDF 工具
-# 系統啟動時會自動建立資料庫、預設角色(Admin等)與管理員帳號(admin/password)
+# 這將花費 2~5 分鐘下載並編譯 Python 與必要的 OCR/PDF 工具。
+# 系統設有獨立的 entrypoint.sh 腳本，當容器啟動時將自動進行「零手動建置」：
+# 1. 執行 flask db upgrade (全自動資料表修訂與驗證)
+# 2. 執行 flask auth init-roles (自動注入 10+ 項細粒度權限節點)
+# 3. 執行 flask auth seed-users (自動填寫 6 項預設功能測試防護帳號)
 docker-compose --env-file .env up -d --build
 ```
 

@@ -4,11 +4,7 @@ services:
   web:
     build: .
     command: >
-      sh -c "flask db upgrade &&
-             flask auth init-roles &&
-             flask auth create-user admin password --role Admin || true &&
-             flask auth seed-users || true &&
-             gunicorn --bind 0.0.0.0:5000 -w 4 run:app"
+      sh entrypoint.sh
     volumes:
       # 將本機的 instance 資料夾掛載至容器內，確保 app.db (SQLite) 及 token 不會因重啟而丟失
       # 以及 Google API credentials

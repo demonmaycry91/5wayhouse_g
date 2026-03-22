@@ -49,18 +49,20 @@ def reset_password(username, new_password):
 @with_appcontext
 def init_roles():
     """在資料庫中建立預設的角色與權限 (Admin, Manager, Cashier)"""
-    from app.modules.auth.models import Permission
+    from app.modules.auth.models import PERMISSION_STRUCTURE
     import click
-    all_perms = [p for p in dir(Permission) if not p.startswith('__') and isinstance(getattr(Permission, p), str)]
+    all_perms = []
+    for group, perms in PERMISSION_STRUCTURE.items():
+        all_perms.extend(perms.keys())
     
     default_roles = {
         'Admin': all_perms,
-        'Manager': ['MANAGE_LOCATIONS', 'VIEW_REPORTS', 'OPERATE_POS'],
-        'Cashier': ['OPERATE_POS'],
-        'Logistic': ['ACCESS_WAREHOUSE'],
-        'Workshop': ['ACCESS_WORKSHOP'],
-        'Reception': ['ACCESS_ACCOMMODATION'],
-        'Coordinator': ['ACCESS_VOLUNTEER']
+        'Manager': ['admin_locations', 'admin_users', 'report_view_daily', 'report_consolidated'],
+        'Cashier': ['pos_operate_cashier'],
+        'Logistic': ['access_warehouse'],
+        'Workshop': ['access_workshop'],
+        'Reception': ['access_accommodation'],
+        'Coordinator': ['access_volunteer']
     }
     
     for r_name, r_perms in default_roles.items():
