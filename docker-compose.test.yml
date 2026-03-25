@@ -1,0 +1,53 @@
+# ============================================================
+# 乾淨測試環境 - 不影響正式服務
+# 
+# 使用方式：
+#   1. cp .env.example .env.test  然後填入 SECRET_KEY
+#   2. docker-compose -f docker-compose.test.yml --project-name 5wayhouse-test --env-file .env.test up -d --build
+#   3. 開啟瀏覽器 http://localhost:5009  (帳號: admin / 密碼: 123456)
+#
+# 清除測試環境：
+#   docker-compose -f docker-compose.test.yml --project-name 5wayhouse-test down -v
+#   rm -rf instance_test/
+# ============================================================
+
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: >
+      sh entrypoint.sh
+    volumes:
+      # 使用獨立的測試資料夾，不影響正式 instance/
+      - ./instance_test:/app/instance
+    ports:
+      # 使用 5009 port，不與正式服務 5001 衝突
+      - "5009:5000"
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_URL=redis://redis-test:6379/0
+    depends_on:
+      - redis-test
+    restart: "no"
+
+  worker:
+    build: .
+    command: rq worker cashier-tasks -u redis://redis-test:6379/0
+    volumes:
+      - ./instance_test:/app/instance
+    environment:
+      - REDIS_URL=redis://redis-test:6379/0
+      - FLASK_APP=run.py
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - redis-test
+    restart: "no"
+
+  redis-test:
+    image: redis:alpine
+    restart: "no"
+
+volumes: {}
